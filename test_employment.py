@@ -1,0 +1,69 @@
+
+import os
+import requests
+import pandas as pd
+
+print("กำลังเชื่อมต่อ API อัตราการมีงานทำ...")
+
+API_URL = "https://opend.data.go.th/get-ckan/datastore_search"
+
+RESOURCE_ID = "585e5552-8ecf-445c-be16-a97140018169"
+
+API_KEY = (os.getenv("THGOV_OPENDATA_TOKEN") or "").strip()
+
+if not API_KEY:
+    raise SystemExit(
+        "ไม่พบ API Key กรุณาตั้งค่าใน PowerShell ก่อน"
+    )
+
+params = {
+    "resource_id": RESOURCE_ID,
+    "limit": 5
+}
+
+headers = {
+    "api-key": API_KEY
+}
+
+try:
+    response = requests.get(
+        API_URL,
+        params=params,
+        headers=headers,
+        timeout=30
+    )
+
+    print("HTTP Status:", response.status_code)
+    response.raise_for_status()
+
+    data = response.json()
+
+    if not data.get("success", False):
+        print("API แจ้งข้อผิดพลาด:", data)
+    else:
+        result = data["result"]
+        df = pd.DataFrame(result.get("records", []))
+
+        # ทำความสะอาดชื่อคอลัมน์
+        df.columns = (
+            df.columns
+            .str.replace("\ufeff", "", regex=False)
+            .str.strip()
+        )
+
+        print("จำนวนรายการทั้งหมด:", result.get("total"))
+        print("\nชื่อคอลัมน์:")
+        print(df.columns.tolist())
+
+        print("\nตัวอย่างข้อมูล 5 แถวแรก:")
+        print(df.head().to_string(index=False))
+
+except requests.HTTPError as error:
+    print("เรียก API ไม่สำเร็จ:", error)
+    print("รายละเอียด:", response.text[:500])
+
+except requests.RequestException as error:
+    print("เชื่อมต่อไม่ได้:", error)
+
+except (ValueError, KeyError) as error:
+    print("รูปแบบข้อมูลไม่ถูกต้อง:", error)
