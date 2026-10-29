@@ -43,7 +43,7 @@ def style(fig: go.Figure, *, height=420, ytitle="", legend_bottom=True, top=30, 
     legend_px = rows * 20 + 12 if rows else 0
     bottom = 62 + legend_px if xtitle_room else 28 + legend_px
     fig.update_layout(
-        font=FONT, height=height + legend_px, paper_bgcolor="white", plot_bgcolor="white",
+        font=FONT, height=height + legend_px, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(l=8, r=12, t=top, b=bottom), hovermode="closest",
         hoverlabel=dict(font=dict(family=theme.FONT_STACK, size=13)),
         showlegend=bool(rows),
@@ -79,6 +79,30 @@ def _category_x(fig, lo, hi, row=None, col=None):
         fig.update_xaxes(row=row, col=col, **kw)
     else:
         fig.update_xaxes(**kw)
+
+
+def shade_focus(fig: go.Figure, lo: int, hi: int, focus: tuple[int, int] | None) -> None:
+    """Shade the picked years on a category time axis that runs from quarter lo to hi (nothing when they cover it all)."""
+    if not focus:
+        return
+    a, b = max(focus[0], lo), min(focus[1], hi)
+    if a > b or (a == lo and b == hi):
+        return
+    fig.add_vrect(x0=a - lo - 0.5, x1=b - lo + 0.5, fillcolor=rgba(theme.PRIMARY, 0.08), line_width=0, layer="below",
+                  annotation_text="ช่วงที่เลือก", annotation_position="top left", annotation_font=dict(size=11, color=theme.MUTED))
+
+
+def shade_excluded(fig: go.Figure, lo: int, hi: int, idxs, label: str = "ไม่แสดงค่า") -> None:
+    """Grey bands over the quarters whose values were left out because the source tables disagree (runs of neighbouring quarters are one band)."""
+    runs: list[list[int]] = []
+    for i in sorted({int(i) for i in idxs if lo <= int(i) <= hi}):
+        if runs and i == runs[-1][1] + 1:
+            runs[-1][1] = i
+        else:
+            runs.append([i, i])
+    for a, b in runs:
+        fig.add_vrect(x0=a - lo - 0.5, x1=b - lo + 0.5, fillcolor="rgba(120,110,130,0.16)", line_width=0, layer="below",
+                      annotation_text=label if b > a else "ขัดแย้ง", annotation_position="top", annotation_font=dict(size=11, color=theme.MUTED))
 
 
 def _full(df: pd.DataFrame, by: list[str] | None = None) -> pd.DataFrame:
@@ -117,7 +141,7 @@ def area_under(fig: go.Figure, x, y, color: str, row: int | None = None, col: in
 
 
 def trend_line(df: pd.DataFrame, y: str, ytitle: str, hover_unit: str, *, flag_col: str | None = None,
-               sig_col: str | None = None, color=theme.PRIMARY, decimals=2, height=400) -> go.Figure:
+               sig_col: str | None = None, color=theme.PRIMARY, decimals=2, height=400, focus: tuple[int, int] | None = None) -> go.Figure:
     """Single-series trend. ``flag_col`` False -> point drawn as amber diamond (data-quality flag);
     ``sig_col`` True -> larger ring (statistically unusual เทียบปีก่อน change)."""
     d = df.sort_values("period_idx")
@@ -144,6 +168,7 @@ def trend_line(df: pd.DataFrame, y: str, ytitle: str, hover_unit: str, *, flag_c
                                      hovertemplate="<b>%{x}</b><br>เทียบปีก่อน ผิดปกติเชิงสถิติ<extra></extra>"))
     style(fig, ytitle=f"{ytitle} ({hover_unit})", height=height)
     _category_x(fig, int(d["period_idx"].min()), int(d["period_idx"].max()))
+    shade_focus(fig, int(d["period_idx"].min()), int(d["period_idx"].max()), focus)
     return fig
 
 
@@ -175,7 +200,8 @@ def grouped_bar(df: pd.DataFrame, x: str, y: str, group: str, ytitle: str, unit:
 
 
 def multi_line(df: pd.DataFrame, y: str, group: str, ytitle: str, unit: str, decimals=2, height=420,
-               dash_col: str | None = None) -> go.Figure:
+               dash_col: str | None = None, focus: tuple[int, int] | None = None, colors: dict | None = None,
+               excluded=None) -> go.Figure:
     fig = go.Figure()
     d = df.sort_values("period_idx")
     base = _full(d)
@@ -184,11 +210,14 @@ def multi_line(df: pd.DataFrame, y: str, group: str, ytitle: str, unit: str, dec
         full = base.merge(sub, on="period_idx", how="left")
         fig.add_trace(go.Scatter(
             x=full["x"], y=full[y], mode="lines+markers", name=str(g), connectgaps=False,
-            line=dict(color=theme.SERIES[i % len(theme.SERIES)], width=2.2, dash=dashes[(i // len(theme.SERIES)) % 4]),
+            line=dict(color=(colors or {}).get(g) or theme.SERIES[i % len(theme.SERIES)], width=2.2, dash=dashes[(i // len(theme.SERIES)) % 4]),
             marker=dict(size=5, symbol=["circle", "square", "diamond", "triangle-up", "x", "cross", "star"][i % 7]),
             hovertemplate="<b>%{x}</b><br>" + str(g) + ": %{y:,." + str(decimals) + "f} " + unit + "<extra></extra>"))
     style(fig, ytitle=f"{ytitle} ({unit})", height=height)
     _category_x(fig, int(d["period_idx"].min()), int(d["period_idx"].max()))
+    shade_focus(fig, int(d["period_idx"].min()), int(d["period_idx"].max()), focus)
+    if excluded:
+        shade_excluded(fig, int(d["period_idx"].min()), int(d["period_idx"].max()), excluded)
     return fig
 
 
@@ -207,10 +236,27 @@ def region_bar(df: pd.DataFrame, value: str, xtitle: str, unit: str, decimals=1,
     return fig
 
 
+def province_ranks(df: pd.DataFrame, value: str, top: int, decimals: int = 2, max_extra: int = 5) -> pd.DataFrame:
+    """The ``top`` highest provinces plus any that tie with the last one (at most ``max_extra`` more), with a shared rank
+    for equal values as published (rounded to ``decimals``): column ``rank`` (1, 1, 3, ...) and ``tied``."""
+    d = df.dropna(subset=[value]).copy()
+    d["_v"] = d[value].round(decimals)
+    d = d.sort_values(["_v", "province"], ascending=[False, True])
+    if d.empty:
+        return d.drop(columns="_v")
+    cut = d["_v"].iloc[min(top, len(d)) - 1]
+    d = d[d["_v"] >= cut].head(top + max_extra)
+    d["rank"] = d["_v"].rank(method="min", ascending=False).astype(int)
+    d["tied"] = d["_v"].duplicated(keep=False)
+    return d.drop(columns="_v")
+
+
 def province_bar(df: pd.DataFrame, value: str, xtitle: str, unit: str, top: int = 15, decimals=2) -> go.Figure:
-    d = df.dropna(subset=[value]).sort_values(value, ascending=False).head(top).sort_values(value)
+    """Highest provinces; equal values share a rank ("อันดับ 3=") and a tie with the last place is kept, not cut at random."""
+    d = province_ranks(df, value, top, decimals).iloc[::-1]
+    labels = [f"{p_} ({r_}{'=' if t_ else ''})" for p_, r_, t_ in zip(d["province"], d["rank"], d["tied"])]
     fig = go.Figure(go.Bar(
-        y=d["province"], x=d[value], orientation="h", marker_color=theme.PRIMARY,
+        y=labels, x=d[value], orientation="h", marker_color=theme.PRIMARY,
         text=[f"{v:,.{decimals}f}" for v in d[value]], textposition="outside", cliponaxis=False,
         hovertemplate="<b>%{y}</b><br>" + xtitle + ": %{x:,." + str(decimals) + "f} " + unit + "<extra></extra>"))
     style(fig, height=max(320, 30 * len(d) + 90), legend_bottom=False)
@@ -298,7 +344,7 @@ def donut(df: pd.DataFrame, label: str, value: str, unit: str, centre_title: str
         textinfo="percent", textfont=dict(size=13, color="white"),
         hovertemplate="<b>%{label}</b><br>%{value:,." + str(decimals) + "f} " + unit + " (%{percent})<extra></extra>"))
     fig.update_layout(
-        font=FONT, height=height, paper_bgcolor="white", margin=dict(l=8, r=8, t=16, b=52), showlegend=True,
+        font=FONT, height=height, paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=8, r=8, t=16, b=52), showlegend=True,
         legend=dict(orientation="h", yref="container", y=0, yanchor="bottom", x=0.5, xanchor="center", font=dict(size=13)),
         annotations=[dict(text=f"<b>{total:,.{decimals}f}</b><br><span style='font-size:12px'>{unit}</span><br>"
                                f"<span style='font-size:11px'>{centre_title}</span>", x=0.5, y=0.5, showarrow=False, font=dict(size=18))],
@@ -322,6 +368,7 @@ def _region_color(region: str, value) -> str:
     return REGION_COLORS.get(region, "#7A7A7A") if value == value else NO_VALUE_COLOR
 
 
+
 def region_map(geo: dict, df: pd.DataFrame, label: str, unit: str, decimals: int = 2, height: int = 320):
     """Map of Thailand where every region has its own colour (all provinces of a region share it).
 
@@ -342,19 +389,21 @@ def region_map(geo: dict, df: pd.DataFrame, label: str, unit: str, decimals: int
             text=g["hover"], hovertemplate="%{text}<extra></extra>"))
     fig.update_traces(selected=dict(marker=dict(opacity=1)), unselected=dict(marker=dict(opacity=1)))
     fig.update_geos(fitbounds="locations", visible=False, bgcolor="white", projection_type="mercator")
-    fig.update_layout(font=FONT, height=height, paper_bgcolor="white", margin=dict(l=0, r=0, t=4, b=4), showlegend=False,
+    fig.update_layout(font=FONT, height=height, paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=0, r=0, t=4, b=4), showlegend=False,
                       clickmode="event+select", dragmode="select",
                       hoverlabel=dict(font=dict(family=theme.FONT_STACK, size=13)))
     return fig
 
 
 def region_map_legend(df: pd.DataFrame, label: str, unit: str, decimals: int = 2, compact: bool = False, vertical: bool = False) -> str:
-    """HTML colour key: swatch, region name and its value (colour is never the only carrier of meaning)."""
+    """HTML colour key: each region (highest value first) with its own colour swatch and its value
+    (colour is never the only carrier of meaning)."""
     import html as _html
 
     rows = df.drop_duplicates("region").set_index("region")["value"]
+    order = rows.sort_values(ascending=False, na_position="last").index
     items = []
-    for region in [r for r in REGION_ORDER if r in rows.index] + [r for r in rows.index if r not in REGION_COLORS]:
+    for region in order:
         v = rows[region]
         val = (f"{v:,.{decimals}f}" if compact else f"{v:,.{decimals}f} {unit}") if v == v else "ไม่มีข้อมูล"
         items.append(f'<span class="rlg"><i style="background:{_region_color(region, v)}"></i>{_html.escape(region)} <b>{_html.escape(val)}</b></span>')
@@ -424,26 +473,73 @@ def region_svg_map(geo: dict, df: pd.DataFrame, label: str, unit: str, decimals:
 
 
 MAP_CSS = """
-.rmap { width: 100%; height: 100%; max-height: 340px; display: block; }
-.rmap path { stroke: #fff; stroke-width: 7; stroke-linejoin: round; cursor: pointer; transition: opacity .12s; }
+.rmap { width: 100%; height: 100%; max-height: 520px; display: block; }
+.rmap path { stroke: #fff; stroke-width: 7; stroke-linejoin: round; cursor: pointer; transition: opacity .3s ease; }
 .rmap.dim path { opacity: .45; }
 .rmap.dim path.on { opacity: 1; }
+.rmap.zooming path { pointer-events: none; }
+.rmap.zooming path:not(.zt) { opacity: 0; }
 """
 
+# Clicking a region zooms the view box onto it (about .5 s), the other regions fade out, and only then is the click sent to
+# Python, whose redraw starts on the very same view box. "Back to the whole country" zooms out from the old view box.
+# Viewers who ask for reduced motion get no animation.
 MAP_JS = """
 export default function(component) {
     const { data, setTriggerValue, parentElement } = component;
+    const w = window;
     let box = parentElement.querySelector('.mapbox');
     if (!box) { box = document.createElement('div'); box.className = 'mapbox'; parentElement.appendChild(box); }
     box.innerHTML = data || '';
     const svg = box.querySelector('svg');
     if (!svg) return;
-    const paths = svg.querySelectorAll('path[data-region]');
+    const paths = Array.from(svg.querySelectorAll('path[data-region]'));
+    const reduce = () => !!(w.matchMedia && w.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    const regions = new Set(paths.map((p) => p.getAttribute('data-region')));
+    const zoomed = regions.size === 1;
+    const nums = (v) => v.trim().split(' ').map(Number);
+    const finalVb = svg.getAttribute('viewBox');
+
+    function animateVb(from, to, ms, done) {
+        const a = nums(from), b = nums(to), t0 = Date.now();
+        let ended = false;
+        function end() { if (ended) return; ended = true; svg.setAttribute('viewBox', to); if (done) done(); }
+        function step() {
+            if (ended) return;
+            const k = Math.min(1, (Date.now() - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+            svg.setAttribute('viewBox', a.map((x, i) => (x + (b[i] - x) * e).toFixed(1)).join(' '));
+            if (k < 1) setTimeout(step, 16); else end();
+        }
+        step();
+        setTimeout(end, ms + 250);
+    }
+
+    // zoom out: the previous map showed one region; start from its view box and open up to the whole country
+    const prev = w.__lmMapView;
+    if (!zoomed && prev && prev.zoomed && Date.now() - prev.t < 4000 && !reduce()) animateVb(prev.vb, finalVb, 550);
+    w.__lmMapView = { zoomed: zoomed, vb: finalVb, t: Date.now() };
+
+    function targetBox(region) {
+        let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+        paths.filter((p) => p.getAttribute('data-region') === region).forEach((p) => {
+            const b = p.getBBox();
+            x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y); x1 = Math.max(x1, b.x + b.width); y1 = Math.max(y1, b.y + b.height);
+        });
+        const pad = Math.max(x1 - x0, y1 - y0) * 0.03;
+        return [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad].map((v) => v.toFixed(0)).join(' ');
+    }
+
     paths.forEach((p) => {
         const r = p.getAttribute('data-region');
         p.onmouseenter = () => { svg.classList.add('dim'); paths.forEach((q) => q.classList.toggle('on', q.getAttribute('data-region') === r)); };
         p.onmouseleave = () => { svg.classList.remove('dim'); paths.forEach((q) => q.classList.remove('on')); };
-        p.onclick = () => setTriggerValue('region', r);
+        p.onclick = () => {
+            if (zoomed || reduce()) { setTriggerValue('region', r); return; }
+            svg.classList.remove('dim');
+            svg.classList.add('zooming');
+            paths.forEach((q) => q.classList.toggle('zt', q.getAttribute('data-region') === r));
+            animateVb(svg.getAttribute('viewBox'), targetBox(r), 520, () => setTriggerValue('region', r));
+        };
     });
 }
 """

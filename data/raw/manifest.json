@@ -262,5 +262,17 @@
     "content_type": "text/csv; charset=utf-8",
     "bytes": 841210,
     "sha256": "482e078655a142087e17857678d00d087813c52a28d0d821b90753ed8057b18b"
+  },
+  "nso_emp_age_sex": {
+    "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_01&format=csv",
+    "filename": "nso_emp_age_sex.csv",
+    "fetched_at": "2026-10-29T12:36:43+00:00",
+    "last_success_at": "2026-10-29T12:36:43+00:00",
+    "last_attempt_at": "2026-10-29T12:36:43+00:00",
+    "last_attempt_ok": true,
+    "http_status": 200,
+    "content_type": "text/csv; charset=utf-8",
+    "bytes": 877144,
+    "sha256": "40b4395d1bb4e2e67695c6e72ec82b0a2b90d8174db29743b2ba02e1999df1b6"
   }
 }

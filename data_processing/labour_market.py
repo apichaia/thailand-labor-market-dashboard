@@ -221,6 +221,15 @@ def _jump_failures(s: pd.Series, tol: float) -> set:
     return set(s.index[((s / med - 1).abs() > tol).to_numpy()])
 
 
+def _table_name(key: str) -> str:
+    """'ชื่อสั้น (รหัสตาราง สสช.)' for a source key, e.g. the table code at the end of its URL."""
+    import re
+
+    spec = config.SOURCES_BY_KEY.get(key)
+    m = re.search(r"((?:OS|LFS|ST)_\d+_[0-9A-Z_]+)", spec.url) if spec is not None else None
+    return m.group(1) if m else key
+
+
 def _period_meta(idxs) -> pd.DataFrame:
     idxs = sorted({int(i) for i in idxs})
     return pd.DataFrame({
@@ -255,6 +264,12 @@ def build(b, t: dict) -> None:
                                  f"อัตรามีงานทำระดับประเทศจาก {emp_frame.shape[1]} ตารางไม่ตรงกัน (เกิน {config.EMP_AGREE_TOL_PP} จุด) {len(emp_bad)} ไตรมาส: {_fmt_periods(emp_bad)} — ไม่ใช้",
                                  len(emp_bad)))
     emp_nat = emp_frame.bfill(axis=1).iloc[:, 0] if len(emp_frame) else pd.Series(dtype=float)
+    conf = b.availability.setdefault("conflicts", {})
+    emp_names = {"sex_age": "ตารางเพศ×อายุ " + _table_name("nso_er_sex_age"), "edu": "ตารางการศึกษา " + _table_name("nso_er_edu"),
+                 "region_sex": "ตารางภาค×เพศ " + _table_name("nso_er_region_sex")}
+    conf["emp"] = [{"period_idx": int(p), "values": {emp_names[k]: float(emp_frame.at[p, k]) for k in emp_frame.columns if pd.notna(emp_frame.at[p, k])},
+                    "gap": float(spread[p]), "unit": "%", "gap_unit": "จุด",
+                    "reason": f"ตาราง สสช. {emp_frame.shape[1]} ตารางให้อัตรามีงานทำระดับประเทศต่างกันเกิน {config.EMP_AGREE_TOL_PP} จุด"} for p in sorted(emp_bad)] if len(emp_frame) else []
     # ---- national wage: three tables must agree, and no unexplained jump ------------------------------
     wage_c = {"age": _national_series(w_age, "wage", area="รวม", sex="รวม", age_group="รวม"),
               "edu": _national_series(w_edu, "wage", area="รวม", sex="รวม", level_of_edu="รวม"),
@@ -274,6 +289,17 @@ def build(b, t: dict) -> None:
                                  "และไม่มีเหตุผลทางข้อมูลที่จะเลือกตารางใดเป็นฝ่ายถูก จึงไม่ใช้ค่าจ้างของไตรมาสเหล่านี้ในทุกตาราง", len(wage_bad),
                                  {"periods": sorted(wage_bad)}))
     wage_nat = wage_frame.bfill(axis=1).iloc[:, 0] if len(wage_frame) else pd.Series(dtype=float)
+    wage_names = {"age": "ตารางกลุ่มอายุ " + _table_name("nso_w_age"), "edu": "ตารางการศึกษา " + _table_name("nso_w_edu"),
+                  "industry": "ตารางอุตสาหกรรม " + _table_name("nso_w_industry")}
+    rows = []
+    if len(wage_frame):
+        ref_ok = wage_ref.drop(index=[i for i in wage_bad if i in wage_ref.index]) if len(wage_ref) else wage_ref
+        med = ref_ok.sort_index().rolling(5, center=True, min_periods=3).median() if len(ref_ok) >= 5 else pd.Series(dtype=float)
+        for p in sorted(wage_bad):
+            vals = {wage_names[k]: float(wage_frame.at[p, k]) for k in wage_frame.columns if p in wage_frame.index and pd.notna(wage_frame.at[p, k])}
+            gap = (max(vals.values()) / min(vals.values()) - 1) * 100 if len(vals) >= 2 and min(vals.values()) > 0 else None
+            rows.append({"period_idx": int(p), "values": vals, "gap": gap, "unit": "บาท", "gap_unit": "%", "reason": wage_bad[p]})
+    conf["wage"] = rows
     b.excluded["lm_wage"] = sorted(wage_bad)
     b.excluded["lm_emp"] = sorted(emp_bad)
 

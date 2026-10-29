@@ -38,6 +38,17 @@ class Filters:
     def edu_active(self) -> bool:
         return bool(self.edus) and set(self.edus) != set(EDU_ORDER)
 
+    def for_trend(self, min_years: int = 7) -> "Filters":
+        """The same filters over at least ``min_years`` years ending at year_max, so a trend chart has history to show
+        even when one year is picked (the picked years are shaded on the chart with ``focus``)."""
+        lo = min(self.year_min, self.year_max - min_years + 1) if self.year_max else self.year_min
+        return Filters(lo, self.year_max, self.quarters, self.regions, self.sexes, self.edus)
+
+    @property
+    def focus(self) -> tuple[int, int]:
+        """First and last quarter index (year_be * 4 + quarter - 1) of the picked years."""
+        return self.year_min * 4, self.year_max * 4 + 3
+
     def describe(self) -> str:
         parts = [f"ปี {self.year_min}–{self.year_max}"]
         if set(self.quarters) != {1, 2, 3, 4}:

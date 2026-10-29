@@ -76,18 +76,54 @@ def notice(kind: str, text: str, title: str | None = None, brief: str | None = N
             st.markdown(text, unsafe_allow_html=True)
         return
     if kind == "info":
-        with st.expander("ℹ️ " + t):
+        with st.expander(t, icon=":material/info:"):
             st.markdown(text, unsafe_allow_html=True)
         return
     st.markdown(f'<div class="notice {kind}"><b>{esc(t)}</b>{text}</div>', unsafe_allow_html=True)
 
 
 def empty_state(reason: str, kind: str = "warn") -> None:
-    notice(kind, esc(reason), "ไม่สามารถแสดงข้อมูลนี้")
+    """Where a chart has no trustworthy data: the puzzled mascot and the reason (nothing is estimated)."""
+    from dashboard import mascot
+
+    st.markdown(f'<div class="empty-card {kind}"><div class="empty-char">{mascot.unsure3d()}</div>'
+                f'<div><b>ไม่สามารถแสดงข้อมูลนี้</b> {esc(reason)}</div></div>', unsafe_allow_html=True)
 
 
 def section_title(text: str, tip: str | None = None) -> None:
     st.markdown(f'<div class="section-title">{esc(text)} {info(tip) if tip else ""}</div>', unsafe_allow_html=True)
+
+
+def _fmt_conflict_value(v: float, unit: str) -> str:
+    if unit == "บาท":
+        return f"{v:,.0f} บาท"
+    if unit == "พันคน":
+        return f"{v:,.1f} พันคน"
+    return f"{v:,.2f}{unit}"
+
+
+def conflict_table_html(rows: list[dict], period_label) -> str:
+    """The quarters left out because the NSO tables disagree: what each table says, how far apart they are, and why the quarter is not shown."""
+    body = []
+    for r in rows:
+        vals = "<br>".join(f"{esc(k)}: <b>{esc(_fmt_conflict_value(v, r.get('unit', '')))}</b>" for k, v in r.get("values", {}).items())
+        gap = r.get("gap")
+        gap_txt = "—" if gap is None else f"{gap:,.2f} {r.get('gap_unit', '')}".strip()
+        body.append(f"<tr><td>{esc(period_label(r['period_idx']))}</td><td>{vals}</td><td>{esc(gap_txt)}</td><td>{esc(r.get('reason', ''))}</td></tr>")
+    return ('<table class="cmp-t cf-t"><thead><tr><th>ไตรมาส</th><th>ค่าที่แต่ละตารางของ สสช. ให้</th><th>ต่างกัน</th><th>เหตุผลที่ไม่แสดงค่า</th></tr></thead><tbody>'
+            + "".join(body) + "</tbody></table>")
+
+
+def conflict_box(rows: list[dict], period_label, lo: int | None = None, hi: int | None = None, what: str = "") -> None:
+    """A short sentence naming the quarters that are blank on the chart and why, with the details in an open table."""
+    rows = [r for r in rows if (lo is None or r["period_idx"] >= lo) and (hi is None or r["period_idx"] <= hi)]
+    if not rows:
+        return
+    names = ", ".join(period_label(r["period_idx"]) for r in rows[:6]) + (" …" if len(rows) > 6 else "")
+    st.markdown(f'<div class="cf-note"><b>แถบสีเทาในกราฟ = ไม่แสดงค่า{esc(what)}</b> เพราะตารางต้นทางของ สสช. ขัดแย้งกันเอง ({len(rows)} ไตรมาส: {esc(names)}) '
+                "ระบบไม่เลือกค่าเองและไม่ประมาณค่าแทน</div>", unsafe_allow_html=True)
+    with st.expander("ดูว่าอะไรขัดแย้งกัน (ค่าของแต่ละตาราง)", expanded=False):
+        st.markdown(conflict_table_html(rows, period_label), unsafe_allow_html=True)
 
 
 def chart_caption(source: str, period: str, unit: str, formula: str = "", limits: str = "", url: str | None = None) -> None:
@@ -99,7 +135,7 @@ def chart_caption(source: str, period: str, unit: str, formula: str = "", limits
         parts.append(f"<b>ข้อจำกัด:</b> {esc(limits)}")
     if url:
         parts.append(f'<a href="{esc(url)}" target="_blank" rel="noopener noreferrer">เปิดแหล่งข้อมูลต้นทาง ↗</a>')
-    with st.popover("ℹ️ ที่มา · วิธีคำนวณ · ข้อจำกัด"):
+    with st.popover("ที่มา · วิธีคำนวณ · ข้อจำกัด", icon=":material/info:"):
         st.markdown('<div class="caption">' + " · ".join(parts) + "</div>", unsafe_allow_html=True)
 
 

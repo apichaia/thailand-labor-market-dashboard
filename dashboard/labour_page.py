@@ -1,7 +1,7 @@
 """Page 4: employment rate and average wage, read together with unemployment.
 
 Everything here comes from tables that passed data_processing/labour_market.py. A quarter with no trustworthy value
-is a gap (never interpolated). The window defaults to พ.ศ. 2561-2568, where all sources overlap.
+is a gap (never interpolated). The window defaults to พ.ศ. 2563-2569 (config.JOINT_START_BE/END_BE), where all sources overlap and are checked.
 """
 from __future__ import annotations
 
@@ -149,14 +149,15 @@ def _region_scatter(d: pd.DataFrame, ycol: str, ytitle: str, yunit: str, label_c
     return fig
 
 
-def _setup(ctx: Ctx):
-    """(bundle, filters, lo, hi): the quarter window is the sidebar year (or every year), or None when the data is missing."""
+def _setup(ctx: Ctx, trend: bool = False):
+    """(bundle, filters, lo, hi): the quarter window is the sidebar year (or every year); with ``trend`` it reaches back at
+    least five years so trends and correlations have history even when one year is picked. None when the data is missing."""
     b, f = ctx.bundle, ctx.filters
     if not (b.has("lm_national") and b.has("national")):
         ui.empty_state("ยังไม่มีข้อมูลอัตรามีงานทำ/ค่าจ้างที่ผ่านการตรวจสอบ — กดรีเฟรชข้อมูล หรือดูสถานะในหน้า ที่มาและหลักฐาน")
         return None
     all_idx = pd.concat([b.get("lm_national")["period_idx"], b.get("national")["period_idx"]])
-    lo = max(int(all_idx.min()), f.year_min * 4) if f.year_min else int(all_idx.min())
+    lo = max(int(all_idx.min()), (f.for_trend() if trend else f).year_min * 4) if f.year_min else int(all_idx.min())
     hi = min(int(all_idx.max()), f.year_max * 4 + 3) if f.year_max else int(all_idx.max())
     if lo > hi:
         ui.empty_state("ไม่มีข้อมูลในปีที่เลือก ลองเลือกปีอื่นหรือ ทุกปี")
@@ -166,7 +167,7 @@ def _setup(ctx: Ctx):
 
 def national_section(ctx: Ctx) -> None:
     ui.section_title("ค่าจ้างและการมีงานทำ เมื่ออ่านร่วมกับการว่างงาน")
-    st_ = _setup(ctx)
+    st_ = _setup(ctx, trend=True)
     if st_ is None:
         return
     b, f, lo, hi = st_
@@ -179,7 +180,7 @@ def national_section(ctx: Ctx) -> None:
     emp_bad = [int(i) for i in b.excluded.get("lm_emp", [])] if is_nat else []
     _scope_note(f, ("ภาค", "เพศ"), f" · ขอบเขตอัตรามีงานทำและค่าจ้าง: {scope}")
     for n in scope_notes:
-        st.caption("ℹ️ " + n)
+        st.caption(":material/info: " + n)
 
     e, w, u = _latest(fr, "emp_pct"), _latest(fr, "wage"), _latest(fr, "rate_pct")
     both = fr.dropna(subset=["rate_pct", "emp_pct", "wage"])
@@ -305,7 +306,11 @@ def region_section(ctx: Ctx) -> None:
                     pts = pts.assign(short=pts["region"].str.replace("ภาค", "", regex=False))
                     st.plotly_chart(_region_scatter(pts, "wage", "ค่าจ้างเฉลี่ย", "บาท/เดือน", "short"), width="stretch", key="lm_reg_sc",
                                     config={"displayModeBar": False})
-                    st.caption("มีเพียง 5 จุด จึงไม่คำนวณสหสัมพันธ์")
+                    missing = [r for r in ("กรุงเทพมหานคร", "ภาคเหนือ", "ภาคตะวันออกเฉียงเหนือ", "ภาคกลาง", "ภาคใต้") if r not in set(pts["region"])]
+                    note = f"มี {len(pts)} จุด จึงไม่คำนวณสหสัมพันธ์"
+                    if missing and not picked:
+                        note += " · ไม่มีจุดของ " + ", ".join(missing) + " เพราะไตรมาสนี้ไม่มีค่าจ้างที่เชื่อถือได้ของภาคนั้น (ตั้งแต่ปี 2568 สสช. แยกภาคกลางและภาคใต้เป็นภาคย่อย รวมค่าจ้างกลับไม่ได้) ระบบไม่ประมาณค่าแทน"
+                    st.caption(note)
             tbl = cur[["region", "rate_pct", "emp_pct", "wage"]].rename(columns={
                 "region": "ภูมิภาค", "rate_pct": "อัตราการว่างงาน (%)", "emp_pct": "อัตรามีงานทำ (%)", "wage": "ค่าจ้างเฉลี่ย (บาท/เดือน)"})
             st.dataframe(tbl, width="stretch", hide_index=True, column_config={
@@ -326,7 +331,10 @@ def region_section(ctx: Ctx) -> None:
                 for box, col_, ttl_, unit_, dec_ in ((t1, "emp_pct", "อัตรามีงานทำ", "ร้อยละ", 2), (t2, "wage", "ค่าจ้างเฉลี่ย", "บาท/เดือน", 0)):
                     with box:
                         if tr[col_].notna().sum() >= 2:
-                            _plot(charts.multi_line(tr, col_, "region", ttl_, unit_, dec_), f"lm_regtr_{col_}")
+                            cf_ = (b.availability.get("conflicts") or {}).get("emp" if col_ == "emp_pct" else "wage", [])
+                            lo_c, hi_c = int(tr["period_idx"].min()), int(tr["period_idx"].max())
+                            _plot(charts.multi_line(tr, col_, "region", ttl_, unit_, dec_, excluded=[r["period_idx"] for r in cf_ if lo_c <= r["period_idx"] <= hi_c]), f"lm_regtr_{col_}")
+                            ui.conflict_box(cf_, _plabel, lo_c, hi_c, f" ของ{ttl_}")
                         else:
                             ui.empty_state(f"{ttl_}: มีค่าไม่ถึง 2 ไตรมาสในปีที่เลือก (ลองเลือก ทุกปี)")
             elif len(pool) >= 12:
@@ -387,7 +395,17 @@ def _groups(b, f, lo: int, hi: int, which: str) -> None:
         charts._pad_range(fig, cur["emp_pct"].dropna().tolist() or [1])
         fig.update_xaxes(range=[0, max(cur["wage"].dropna().max() * 1.28, 1)] if cur["wage"].notna().any() else None, row=1, col=2)
         fig.update_xaxes(range=[0, 118], row=1, col=1)
+        no_wage = not cur["wage"].notna().any()
+        if no_wage:   # say so inside the empty panel instead of leaving a blank axis
+            fig.update_xaxes(range=[0, 1], showticklabels=False, showgrid=False, title_text="", row=1, col=2)
+            fig.add_annotation(xref="x2 domain", yref="paper", x=0.5, y=0.5, showarrow=False, align="center",
+                               text="ไม่มีค่าจ้างรายการศึกษา<br>ที่ผ่านการตรวจสอบในไตรมาสนี้", font=dict(size=13, color=theme.MUTED))
         _plot(fig, "lm_edu_fig")
+        if no_wage:
+            w_ok = [int(i) for i in full.index[full["w"] >= 6]]
+            st.caption(":material/info: ไตรมาสนี้มีเฉพาะอัตรามีงานทำ ค่าจ้างของไตรมาสที่ตารางต้นทางขัดแย้งกันถูกเว้นไว้ ไม่ประมาณค่าแทน"
+                       + (f" · ค่าจ้างล่าสุดในช่วงที่เลือก: {_plabel(max(w_ok))} (เลือกได้ที่ตัวเลือกไตรมาสด้านบน)" if w_ok else
+                          " · ลองเลือกปีอื่นหรือ ทุกปี ที่ตัวกรอง"))
         miss = [x for x, e_, w_ in zip(cur["edu"], cur["emp_pct"], cur["wage"]) if pd.isna(e_) or pd.isna(w_)]
         ui.chart_caption("สสช. OS_02_0016_02 (อัตรามีงานทำ) และ OS_02_0024_02 (ค่าจ้าง)", _plabel_full(idx), "ร้อยละ / บาทต่อเดือน",
                          "แถวของแต่ละระดับการศึกษาตามที่ สสช. เผยแพร่ (ระดับประเทศ ทุกเพศ ทุกเขต)",
@@ -401,15 +419,12 @@ def _groups(b, f, lo: int, hi: int, which: str) -> None:
 
 
 def _employed_persons(b, f, lo: int, hi: int) -> None:
-    """Employed persons (shown in persons; the file is in thousands) from the file received from a friend; checked against NSO where NSO has a table."""
+    """Employed persons (shown in persons; the table is in thousands) from NSO OS_02_0002_01, checked against NSO LFS_02_20535_1."""
     nat = b.get("lm_employed_national")
     hc = b.get("lm_headcount")
     if nat.empty or hc.empty:
-        ui.empty_state("ไม่มีข้อมูลจำนวนผู้มีงานทำที่ผ่านการตรวจสอบ (ไฟล์ data/external/final_labor_master_data.csv)")
+        ui.empty_state("ไม่มีข้อมูลจำนวนผู้มีงานทำที่ผ่านการตรวจสอบ (ตาราง สสช. OS_02_0002_01)")
         return
-    ui.notice("info", "ข้อมูลนี้มาจาก <b>ไฟล์ที่เพื่อนส่งให้</b> (ไม่ได้ดึงจากต้นทางโดยตรง) ระบบตรวจกับตารางผู้มีงานทำของ สสช. (LFS_02_20535_1) ทุกครั้งที่โหลด "
-                     "ไตรมาสที่ไม่ผ่านถูกตัด · ปี 2555–2562 สสช. ไม่มีตารางอ้างอิงให้ตรวจ",
-              "แหล่งข้อมูลที่ไม่ใช่ต้นทางโดยตรง")
     _scope_note(f, ("ภาค", "เพศ"))
     regs, sxs = list(f.regions), list(f.sexes)
     if regs or sxs:
@@ -432,7 +447,7 @@ def _employed_persons(b, f, lo: int, hi: int) -> None:
     charts.style(fig, ytitle="ผู้มีงานทำ (คน)", height=380, top=24, legend_bottom=False)
     charts._category_x(fig, int(full["period_idx"].min()), int(full["period_idx"].max()))
     _plot(fig, "lm_emp_total")
-    ui.chart_caption("ไฟล์ที่ได้รับ (คอลัมน์ emp_headcount) ตรวจกับ สสช. LFS_02_20535_1", ui.period_range_text(d.assign(period_label=d["period_idx"].map(_plabel))), "คน",
+    ui.chart_caption("สสช. OS_02_0002_01 จำนวนผู้มีงานทำ ตรวจกับ สสช. LFS_02_20535_1", ui.period_range_text(d.assign(period_label=d["period_idx"].map(_plabel))), "คน",
                      "ผลรวมทุกภาค ทุกเพศ ทุกกลุ่มอายุ (ภาคแบ่งประเทศโดยไม่ซ้ำซ้อน) เฉพาะไตรมาสที่ครบทุกภาค×เพศ×อายุ",
                      "ไม่ได้ปรับฤดูกาล · ไตรมาสที่ไม่ผ่านการตรวจกับ สสช. หรือข้อมูลไม่ครบเป็นช่องว่าง · ผู้มีงานทำ + ผู้ว่างงาน ใกล้เคียงกำลังแรงงานรวม (ส่วนต่างคือผู้รอฤดูกาล)",
                      _src_url("nso_emp_region_sex"))
@@ -449,7 +464,7 @@ def _employed_persons(b, f, lo: int, hi: int) -> None:
     tot = by["emp_k"].sum()
     if tot > 0:
         st.caption(f"{_plabel_full(idx)} · รวม {tot * 1000:,.0f} คน · ชาย {by[by['sex'] == 'ชาย']['emp_k'].sum() / tot * 100:.1f}% หญิง {by[by['sex'] == 'หญิง']['emp_k'].sum() / tot * 100:.1f}%")
-    ui.chart_caption("ไฟล์ที่ได้รับ (emp_headcount) ตรวจกับ สสช. LFS_02_20535_1 ที่ระดับภาค×เพศ", _plabel_full(idx), "คน",
+    ui.chart_caption("สสช. OS_02_0002_01 จำนวนผู้มีงานทำ ตรวจกับ สสช. LFS_02_20535_1 ที่ระดับภาค×เพศ", _plabel_full(idx), "คน",
                      "ผลรวมของทุกภาคในไตรมาสนั้นแยกตามเพศและกลุ่มอายุ", "ตัวเลขกลุ่มอายุ×เพศไม่มีตารางอ้างอิงของ สสช. ให้ตรวจโดยตรง (ตรวจได้ที่ผลรวมของภาค×เพศเท่านั้น)",
                      _src_url("nso_emp_region_sex"))
     _download(by.assign(age_group=by["age_group"].astype(str)), "employed_persons_by_sex_age", "dl_lm_hc")

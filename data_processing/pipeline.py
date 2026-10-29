@@ -22,7 +22,7 @@ from data_processing import clean as c
 from data_processing import labour_market as lm
 from data_processing import master_file as mf
 from data_processing import normalize as nz
-from data_processing import regions5
+from data_processing import intro_payload, regions5
 from data_processing import validation as v
 from data_sources import downloader as dl
 
@@ -53,6 +53,18 @@ class DataBundle:
     @property
     def usable(self) -> bool:
         return self.has("national") and self.has("region_series")
+
+
+def restrict_from(b: DataBundle, start_be: int) -> DataBundle:
+    """A copy of the bundle with every table cut to the quarters from year ``start_be`` on (period_idx = year_be * 4 + quarter - 1).
+    Nothing is estimated: rows are only dropped. Tables without period_idx (province boundaries, labels) are kept as they are."""
+    lo = start_be * 4
+    tables = {k: (df[df["period_idx"] >= lo].reset_index(drop=True) if "period_idx" in df.columns else df) for k, df in b.tables.items()}
+    for k, df in tables.items():
+        if k in b.tables and "period_idx" in df.columns:
+            df.attrs = dict(b.tables[k].attrs)
+    return DataBundle(tables=tables, report=b.report, availability=b.availability,
+                      excluded={k: [p for p in v if p >= lo] for k, v in b.excluded.items()}, geo=b.geo)
 
 
 def _load(key: str, cleaner, bundle: DataBundle, raw_dir: Path, *, path_based=False, encoding="utf-8-sig"):
@@ -164,6 +176,20 @@ def build_dashboard_data(raw_dir: Path | None = None) -> DataBundle:
     note[gap > config.RATE_TOL_PP] = "อัตราที่คำนวณต่างจากที่ สสช. เผยแพร่เกินความคลาดเคลื่อนจากการปัดเศษ"
     note[nat.index.isin(list(lf_failed))] = "กำลังแรงงานจาก 2 ตารางไม่ตรงกัน"
     nat["quality_note"] = note
+    conf_rate = []
+    lf_a, lf_b = (_by_period(lf_os, "value_k") if lf_os is not None else None), (_by_period(lf_rs, "value_k") if lf_rs is not None else None)
+    for p in nat.index[~nat["quality_ok"] & nat["rate_calc_pct"].notna()]:
+        if p in lf_failed and lf_a is not None and lf_b is not None and p in lf_a.index and p in lf_b.index:
+            va, vb = float(lf_a[p]), float(lf_b[p])
+            conf_rate.append({"period_idx": int(p), "values": {"กำลังแรงงานรวม ตาราง OS_02_0001_01": va, "กำลังแรงงานรวม ตาราง LFS_02_20534_1": vb},
+                              "gap": abs(va / vb - 1) * 100 if vb else None, "unit": "พันคน", "gap_unit": "%",
+                              "reason": "กำลังแรงงานรวมจาก 2 ตารางของ สสช. ไม่ตรงกัน (ตัวหารของอัตราไม่แน่นอน) จึงไม่แสดงอัตราการว่างงาน"})
+        elif pd.notna(gap.get(p)) and gap[p] > config.RATE_TOL_PP:
+            conf_rate.append({"period_idx": int(p), "values": {"อัตราที่คำนวณเอง (ผู้ว่างงาน ÷ กำลังแรงงาน)": float(nat.at[p, "rate_calc_pct"]),
+                                                              "อัตราที่ สสช. ประกาศ": float(nat.at[p, "rate_pub_pct"])},
+                              "gap": float(gap[p]), "unit": "%", "gap_unit": "จุด",
+                              "reason": f"อัตราที่คำนวณต่างจากที่ สสช. ประกาศเกิน {config.RATE_TOL_PP} จุด"})
+    b.availability.setdefault("conflicts", {})["rate"] = conf_rate
     # the rate shown on the dashboard exists only where the calculation is consistent
     nat["rate_pct"] = np.where(nat["quality_ok"], nat["rate_calc_pct"], np.nan)
     n_bad = int((~nat["quality_ok"] & nat["rate_calc_pct"].notna()).sum())
@@ -260,23 +286,28 @@ def build_dashboard_data(raw_dir: Path | None = None) -> DataBundle:
         b.tables["bot_reasons"] = bot
 
     lm.build(b, lm_tables)   # employment rate + average wage (checked across their independent tables)
-    if raw_dir == config.DATA_RAW:
-        _load_master_file(b, emp_ref)   # employed persons from the file received from a friend (checked against NSO)
+    _load_headcount(b, emp_ref, raw_dir)   # employed persons by region x sex x age (NSO OS_02_0002_01), checked against NSO LFS_02_20535_1
 
     regions5.collapse(b)   # the same five regions in every period (see regions5.py)
     _write_processed(b)
+    intro_payload.write(b)   # numbers + map for the intro film (never breaks the load)
     return b
 
 
-def _load_master_file(b: DataBundle, emp_ref) -> None:
-    path = config.EXTERNAL_MASTER
+def _load_headcount(b: DataBundle, emp_ref, raw_dir: Path | None = None) -> None:
+    spec = config.SOURCES_BY_KEY["nso_emp_age_sex"]
+    path = dl.raw_path(spec, raw_dir)
     if not path.exists():
         return
     try:
-        df, rep = mf.clean_headcount(c.read_raw_csv(path))
+        raw = c.read_raw_csv(path)
+        raw["quarter"] = raw["quarter"].astype(str).str.extract(r"(\d)")[0]      # "ไตรมาส 3" -> 3
+        raw["area"] = np.nan                                                      # the table has no area split: every row is the all-areas figure
+        raw["emp_headcount"] = raw["value"]
+        df, rep = mf.clean_headcount(raw)
     except Exception as exc:
         log.exception("cannot read %s", path)
-        b.report.add(v.Issue("warning", "read", mf.TABLE, f"อ่านไฟล์ภายนอกไม่ได้: {type(exc).__name__} — ไม่ใช้ไฟล์นี้"))
+        b.report.add(v.Issue("warning", "read", mf.TABLE, f"อ่านตารางผู้มีงานทำตามกลุ่มอายุไม่ได้: {type(exc).__name__} — ไม่ใช้ตารางนี้"))
         b.availability[mf.TABLE] = {"ok": False, "rows": 0, "kind": "validation", "reason": "อ่านไฟล์ไม่ได้"}
         return
     b.report.extend(rep)

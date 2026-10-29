@@ -7,20 +7,31 @@ from __future__ import annotations
 import json
 import logging
 import logging.handlers
+import pickle
 
 import streamlit as st
 
 import config
 from analytics import selectors as sel_
+from dashboard import fx, mascot
 from dashboard import components as ui
 from dashboard import hub, overview, pages, theme
 from dashboard.report import build_summary_markdown
 from data_processing import normalize as nz
 from data_processing.normalize import EDU_ORDER
-from data_processing.pipeline import DataBundle, build_dashboard_data
+from data_processing.pipeline import DataBundle, build_dashboard_data, restrict_from
 from data_sources import downloader as dl
 
-st.set_page_config(page_title="ศูนย์วิเคราะห์ตลาดแรงงานไทย", page_icon="📊", layout="wide", initial_sidebar_state="auto")
+st.set_page_config(page_title="ศูนย์วิเคราะห์ตลาดแรงงานไทย", page_icon=":material/monitoring:", layout="wide", initial_sidebar_state="auto")
+
+_IC_CAL = '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'
+_IC_PIN = '<path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/>'
+_IC_DB = '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>'
+_IC_DOC = '<path d="M6 3h9l4 4v14H6z"/><path d="M9 12h7M9 16h7"/>'
+
+
+def _svg(paths: str) -> str:
+    return f'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">{paths}</svg>'
 
 
 def _setup_logging() -> None:
@@ -36,7 +47,12 @@ def _setup_logging() -> None:
 
 
 _setup_logging()
-st.markdown(theme.CSS + theme.CSS_V2, unsafe_allow_html=True)
+st.markdown(theme.CSS + theme.CSS_V2 + theme.CSS_FX + theme.CSS_BENTO + theme.CSS_3D + theme.CSS_DARK, unsafe_allow_html=True)
+fx.mount(st.session_state.get("snd_on", False), st.session_state.get("dark_on", False))   # outside the sidebar: it must also run while the sidebar is collapsed
+if st.session_state.get("mascot_on", True):
+    st.markdown('<div class="mascot-fixed"><div class="mf-pos"><div class="mf-bubble"></div><div class="mf-pop"><div class="mf-flip">' + mascot.happy3d() + '</div></div></div></div>', unsafe_allow_html=True)   # pops up when the viewer scrolls down to the charts (CSS only)
+else:
+    st.markdown('<div class="mascot-off"></div>', unsafe_allow_html=True)   # keeps the same element in place so turning it off does not rebuild the page
 
 REQUIRED = [s.key for s in config.SOURCES if s.required]
 
@@ -51,9 +67,35 @@ def _signature() -> str:
     return json.dumps({k: (v.get("sha256"), v.get("last_success_at")) for k, v in sorted(m.items())})
 
 
+_BUNDLE_FILE = config.DATA_PROCESSED / "bundle.pickle"   # the validated tables of the last build: a cold start reads this instead of rebuilding (about 5 s)
+
+
+def _code_stamp() -> str:
+    """Changes whenever the cleaning/validation code or the source list changes, so a stale pickle is never used."""
+    files = [*sorted((config.BASE_DIR / "data_processing").glob("*.py")), *sorted((config.BASE_DIR / "data_sources").glob("*.py")), config.BASE_DIR / "config.py"]
+    return "|".join(f"{f.name}:{f.stat().st_size}:{f.stat().st_mtime_ns}" for f in files)
+
+
 @st.cache_data(show_spinner="กำลังตรวจสอบและประมวลผลข้อมูล…", max_entries=2)
-def load_bundle(signature: str) -> DataBundle:  # signature only keys the cache
-    return build_dashboard_data()
+def load_bundle(signature: str) -> DataBundle:  # signature keys the cache (and the file on disk)
+    key = signature + "#" + _code_stamp()
+    try:
+        if _BUNDLE_FILE.exists():
+            with open(_BUNDLE_FILE, "rb") as fh:
+                saved_key, saved = pickle.load(fh)
+            if saved_key == key and isinstance(saved, DataBundle):
+                return restrict_from(saved, config.SCOPE_START_BE)
+    except Exception:   # a damaged or old file just means a rebuild
+        logging.getLogger(__name__).warning("bundle cache unreadable; rebuilding", exc_info=True)
+    bundle = build_dashboard_data()
+    try:
+        tmp = _BUNDLE_FILE.with_suffix(".tmp")
+        with open(tmp, "wb") as fh:
+            pickle.dump((key, bundle), fh, protocol=pickle.HIGHEST_PROTOCOL)
+        tmp.replace(_BUNDLE_FILE)
+    except OSError:
+        logging.getLogger(__name__).warning("could not save the bundle cache", exc_info=True)
+    return restrict_from(bundle, config.SCOPE_START_BE)
 
 
 def _load_ckan() -> dict:
@@ -104,7 +146,7 @@ def overall_status():
 
 kind, status_text, fetched_when = overall_status()
 
-PAGES = ["ภาพรวม", "ภูมิภาค", "กลุ่มแรงงาน"]
+PAGES = ["ภาพรวม", "ภูมิภาค", "กลุ่มแรงงาน", "ที่มาข้อมูล"]
 
 # ---------------------------------------------------------------------------
 # filter state (kept in session_state; defaults are filled once the data is known)
@@ -119,6 +161,8 @@ DEFAULTS = {"f_year": years[-1] if years else None, "f_quarters": [1, 2, 3, 4],
 for k, v_ in DEFAULTS.items():
     if v_ is not None:
         st.session_state.setdefault(k, v_)
+if not st.session_state.get("f_quarters"):
+    st.session_state["f_quarters"] = [1, 2, 3, 4]   # all four quarters are ticked by default (an empty choice means all four, so show it that way)
 
 
 def _reset():
@@ -138,14 +182,16 @@ def _current_filters() -> sel_.Filters:
 
 
 # ---------------------------------------------------------------------------
-# sidebar: logo + filters + tools
+# left panel: logo, the filters (always open), data status and tools
 # ---------------------------------------------------------------------------
 
-filters_now = _current_filters()
+filters = _current_filters()
+fails = st.session_state.get("boot_failures") or []
+ctx = pages.Ctx(bundle=bundle, filters=filters, statuses=statuses, manifest=manifest, ckan=ckan_meta, refresh_failures=fails)
 
 with st.sidebar:
-    st.markdown('<div class="logo"><div class="mark">📊</div><div><div class="t1">LABOR<br>INSIGHT</div>'
-                '<div class="t2">วิเคราะห์ตลาดแรงงานไทย</div></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="logo"><div class="mark"><div class="rail-logo"><i style="height:11px"></i><i style="height:19px"></i><i style="height:27px"></i></div></div>'
+                '<div><div class="t1">LABOR<br>INSIGHT</div><div class="t2">วิเคราะห์ตลาดแรงงานไทย</div></div></div>', unsafe_allow_html=True)
     st.markdown('<div class="side-title">ตัวกรองข้อมูล</div>', unsafe_allow_html=True)
     if bundle.usable:
         with st.container(key="flt_year"):
@@ -159,50 +205,40 @@ with st.sidebar:
         with st.container(key="flt_edu"):
             st.multiselect("ระดับการศึกษา", EDU_ORDER, key="f_edus", placeholder="ทั้งหมด")
         with st.container(key="side_reset"):
-            st.button("↺ รีเซ็ตตัวกรองทั้งหมด", on_click=_reset, width="stretch")
-        st.caption("กราฟตามตัวกรองเท่าที่มีตารางต้นทางรองรับ (ภาค/เพศ/การศึกษาร่วมกันใช้ได้ตั้งแต่ 2561) · กราฟที่ใช้ไม่ได้จะบอกไว้ใต้กราฟ")
-    area = "ทั่วประเทศ" if not filters_now.regions else ", ".join(filters_now.regions)
-    period_txt = ("—" if not filters_now.year_min else (f"พ.ศ. {filters_now.year_min}" if filters_now.year_min == filters_now.year_max else f"พ.ศ. {filters_now.year_min} – {filters_now.year_max}"))
-    dot = {"ok": "🟢", "warn": "🟠", "err": "🔴"}[kind]
-    rows = [("📅", "ช่วงข้อมูล", period_txt), ("📍", "พื้นที่ศึกษา", area), ("🗄️", "อัปเดตล่าสุด", fetched_when), (dot, "สถานะข้อมูล", status_text)]
+            st.button("รีเซ็ตตัวกรองทั้งหมด", icon=":material/restart_alt:", on_click=_reset, width="stretch")
+        st.caption("กราฟตามตัวกรองเท่าที่มีตารางต้นทางรองรับ · กราฟที่ใช้ไม่ได้จะบอกไว้ใต้กราฟ")
+    area = "ทั่วประเทศ" if not filters.regions else ", ".join(filters.regions)
+    period_txt = ("—" if not filters.year_min else (f"พ.ศ. {filters.year_min}" if filters.year_min == filters.year_max else f"พ.ศ. {filters.year_min} – {filters.year_max}"))
+    dot = f'<i class="sdot" style="background:{ {"ok": "#43B581", "warn": "#F2A33A", "err": "#E5484D"}[kind] }"></i>'
+    rows = [(_svg(_IC_CAL), "ช่วงข้อมูล", period_txt), (_svg(_IC_PIN), "พื้นที่ศึกษา", area), (_svg(_IC_DB), "อัปเดตล่าสุด", fetched_when), (dot, "สถานะข้อมูล", status_text)]
     st.markdown('<div class="info-box">' + "".join(
         f'<div class="ir"><span class="ic">{ic}</span><span><span class="k">{ui.esc(k)}</span><span class="v">{ui.esc(v)}</span></span></div>' for ic, k, v in rows)
-        + '<div class="ir src"><span class="ic">🧾</span><span><span class="k">แหล่งข้อมูล</span><span class="v">สสช. (สำรวจภาวะการทำงานของประชากร) · สศช. · ธปท. · สำนักงานประกันสังคม</span></span></div></div>',
+        + '<div class="ir src"><span class="ic">' + _svg(_IC_DOC) + '</span><span><span class="k">แหล่งข้อมูล</span><span class="v">สสช. (สำรวจภาวะการทำงานของประชากร) · สศช. · ธปท. · สำนักงานประกันสังคม</span></span></div></div>',
         unsafe_allow_html=True)
     t1, t2 = st.columns(2, gap="small")
     with t1:
-        if st.button("🔄 รีเฟรช", width="stretch", help="ดึงข้อมูลใหม่จากแหล่งต้นทาง หากล้มเหลวจะคงข้อมูลเดิมไว้"):
+        if st.button("รีเฟรช", icon=":material/refresh:", width="stretch", help="ดึงข้อมูลใหม่จากแหล่งต้นทาง หากล้มเหลวจะคงข้อมูลเดิมไว้"):
             st.session_state["boot_failures"] = do_refresh()
             st.rerun()
-    report_slot = t2.empty()
-
-filters = _current_filters()
-fails = st.session_state.get("boot_failures") or []
-ctx = pages.Ctx(bundle=bundle, filters=filters, statuses=statuses, manifest=manifest, ckan=ckan_meta, refresh_failures=fails)
-with report_slot:
-    st.download_button("⬇ รายงาน", build_summary_markdown(ctx).encode("utf-8"), file_name="labour_market_summary.md", mime="text/markdown",
-                       width="stretch", help="ดาวน์โหลดรายงานสรุป (.md) ตามตัวกรองปัจจุบัน")
-
-
-@st.dialog("ที่มา วิธีการ และหลักฐาน", width="large")
-def _sources_dialog() -> None:
-    hub.evidence(ctx)
+    with t2:
+        st.download_button("รายงาน", build_summary_markdown(ctx).encode("utf-8"), file_name="labour_market_summary.md", mime="text/markdown",
+                           icon=":material/download:", width="stretch", help="ดาวน์โหลดรายงานสรุป (.md) ตามตัวกรองปัจจุบัน")
+    with st.expander("ตั้งค่า", icon=":material/settings:"):
+        st.toggle("โหมดมืด", key="dark_on", value=False, help="เปลี่ยนเป็นธีมสีเข้ม ถนอมสายตาเวลาใช้งานตอนกลางคืน")
+        st.toggle("เสียงเอฟเฟกต์", key="snd_on", value=False, help="เสียงคลิกเบา ๆ เมื่อกดแท็บ ปุ่ม และภาคบนแผนที่ (ปิดไว้ตามค่าเริ่มต้น)")
+        st.toggle("มาสคอตเดินบนหน้าจอ", key="mascot_on", value=True, help="ปิดเพื่อไม่ให้ตัวการ์ตูนบังกราฟ (บนมือถือซ่อนไว้เสมอ)")
+        st.markdown('<button class="lm-motion-btn" type="button"></button>', unsafe_allow_html=True)   # shown only when the system asks for reduced motion (fx.py)
 
 
 # ---------------------------------------------------------------------------
-# hero banner: title, data chips, the three pages
+# hero banner (title) and, right under it, the page tabs
 # ---------------------------------------------------------------------------
 
 with st.container(key="hero"):
-    h_left, h_right = st.columns([2.1, 1.25], gap="small", vertical_alignment="top")
-    with h_left:
-        st.markdown('<h1 class="hero-t">ศูนย์วิเคราะห์ตลาดแรงงานไทย</h1>'
-                    '<div class="hero-s">วิเคราะห์การจ้างงาน การว่างงาน ค่าจ้าง และสภาวะตลาดแรงงานของไทย ในมิติเวลา ภูมิภาค และกลุ่มประชากร</div>',
-                    unsafe_allow_html=True)
-    with h_right:
-        page = st.radio("เลือกหน้า", PAGES, horizontal=True, key="nav_page", label_visibility="collapsed")
-    if st.button("ℹ️ ที่มา วิธีการ และหลักฐาน", key="open_sources"):
-        _sources_dialog()
+    st.markdown('<h1 class="hero-t">ศูนย์วิเคราะห์ตลาดแรงงานไทย</h1>'
+                '<div class="hero-s">วิเคราะห์การจ้างงาน การว่างงาน ค่าจ้าง และสภาวะตลาดแรงงานของไทย ในมิติเวลา ภูมิภาค และกลุ่มประชากร</div>',
+                unsafe_allow_html=True)
+page = st.radio("เลือกหน้า", PAGES, horizontal=True, key="nav_page", label_visibility="collapsed")   # the tabs sit under the banner
 
 if fails:
     net = [f_ for f_ in fails if f_.error_kind == "network"]
@@ -216,7 +252,7 @@ if fails:
               brief=" " + ui.esc(msg[0][:90]) if msg else " ")
 val_fail = [k for k, a in bundle.availability.items() if a.get("kind") == "validation"]
 if val_fail:
-    ui.notice("err", "ข้อมูลที่ดึงมาไม่ผ่านการตรวจสอบคุณภาพ จึงไม่ถูกนำไปคำนวณ: " + ui.esc(", ".join(val_fail)) + " (ดูรายละเอียดที่ปุ่ม ที่มา วิธีการ และหลักฐาน)",
+    ui.notice("err", "ข้อมูลที่ดึงมาไม่ผ่านการตรวจสอบคุณภาพ จึงไม่ถูกนำไปคำนวณ: " + ui.esc(", ".join(val_fail)) + " (ดูรายละเอียดที่แท็บ ที่มาข้อมูล)",
               "ปัญหาด้านคุณภาพข้อมูล (ไม่ใช่ปัญหาเครือข่าย)", brief=" " + ui.esc(", ".join(val_fail)))
 
 if not bundle.usable:
@@ -229,9 +265,12 @@ if not bundle.usable:
 # ---------------------------------------------------------------------------
 
 pages.reset_cards()
-if page == PAGES[0]:
-    overview.home(ctx)
-elif page == PAGES[1]:
-    hub.regional(ctx)
-else:
-    hub.population(ctx)
+with st.container(key=f"page_{PAGES.index(page)}"):
+    if page == PAGES[0]:
+        overview.home(ctx)
+    elif page == PAGES[1]:
+        hub.regional(ctx)
+    elif page == PAGES[2]:
+        hub.population(ctx)
+    else:
+        hub.evidence(ctx)

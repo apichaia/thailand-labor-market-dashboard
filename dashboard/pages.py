@@ -229,7 +229,7 @@ def _labour_row(ctx: Ctx, idx: int, period: str) -> None:
     rows = [("จำนวนผู้ว่างงาน", last(nat, "u_k"), ""), ("อัตราการว่างงาน (ผ่านการตรวจ)", last(nat, "rate_pct"), ""),
             ("อัตรามีงานทำ", last(lmn, "emp_pct"), ""),
             ("ค่าจ้างเฉลี่ย (ผ่านการตรวจ)", last(lmn, "wage"), f"เว้น {len(wage_bad)} ไตรมาส" if wage_bad else ""),
-            ("จำนวนผู้มีงานทำ (ไฟล์เพื่อน)", last(emp_nat, "emp_k"), "" if len(emp_nat) else ""),
+            ("จำนวนผู้มีงานทำ (สสช. OS_02_0002_01)", last(emp_nat, "emp_k"), "" if len(emp_nat) else ""),
             ("GDP เติบโต", last(gdp, "gdp_yoy_pct"), "")]
     body = "".join(f'<div><span class="k">{ui.esc(k)}:</span> <b>{ui.esc(_plabel(i) if i is not None else "—")}</b>'
                    + (f' <span class="muted">({ui.esc(note)})</span>' if note else "") + "</div>" for k, i, note in rows)
@@ -287,12 +287,14 @@ def _edu_tab(b, f):
 
     st.markdown("**แนวโน้มแยกตามกลุ่มการศึกษา**")
     mode = st.radio("แสดง", ["จำนวน (คน)", "อัตรา (%)"], horizontal=True, key="edu_trend_mode")
+    tf = f.for_trend()   # the whole 2563+ scope; the picked years are shaded
+    cnt_t, rates_t = sel_.breakdown_education(b, tf), sel_.education_rates(b, tf)
     if mode.startswith("จำนวน"):
-        tr = persons(cnt.data)
-        fig = charts.multi_line(tr, "u_k", "edu_group", "จำนวนผู้ว่างงาน", "คน", 0)
-    elif not rates.empty:
-        tr = rates.data
-        fig = charts.multi_line(tr, "rate_pct", "edu_group", "อัตราการว่างงาน", "ร้อยละ", 2)
+        tr = persons(cnt_t.data)
+        fig = charts.multi_line(tr, "u_k", "edu_group", "จำนวนผู้ว่างงาน", "คน", 0, focus=f.focus)
+    elif not rates_t.empty:
+        tr = rates_t.data
+        fig = charts.multi_line(tr, "rate_pct", "edu_group", "อัตราการว่างงาน", "ร้อยละ", 2, focus=f.focus)
     else:
         ui.empty_state(rates.unavailable_reason or "ไม่มีอัตรา")
         fig = None
@@ -398,7 +400,7 @@ def regional(ctx: Ctx) -> None:
         _region_map(b, f, idx, "reg_map", height=430)
     ui.chart_caption("ขอบเขตจังหวัด geoBoundaries (ODbL 1.0, ข้อมูลจาก OpenStreetMap) · ภาคของแต่ละจังหวัด สสช. (ST_02_2005005_4) · ค่า สสช. (OS_02_0003_01, OS_02_0001_01)",
                      _plabel_full(idx), "ร้อยละ / คน",
-                     "แต่ละสีคือหนึ่งภูมิภาค ตัวเลขของภาคอยู่ในคำอธิบายสีใต้แผนที่และเมื่อชี้ที่จังหวัด; อัตรา = ผู้ว่างงานของภาค ÷ กำลังแรงงานของภาค × 100",
+                     "แต่ละสีคือหนึ่งภูมิภาค ตัวเลขของภาคอยู่ในคำอธิบายสีข้างแผนที่ (เรียงจากค่ามากไปน้อย) และเมื่อชี้ที่จังหวัด; อัตรา = ผู้ว่างงานของภาค ÷ กำลังแรงงานของภาค × 100",
                      "ไม่ใช่ข้อมูลรายจังหวัด (ดูรายจังหวัดด้านล่าง); มีเฉพาะปี 2563 เป็นต้นไป; ปี 2568 รวม 7 ภาคกลับเป็น 5 ภาค; ภาคที่ไม่มีค่าเป็นสีเทา",
                      "https://www.geoboundaries.org/")
     c1, c2 = st.columns(2, gap="large")
@@ -418,10 +420,14 @@ def regional(ctx: Ctx) -> None:
     st.markdown("**แนวโน้มแยกตามภูมิภาค**")
     mode = st.radio("แสดง", ["จำนวน (คน)", "อัตรา (%)"], horizontal=True, key="reg_trend_mode")
     col, ttl, unit = ("u_k", "จำนวนผู้ว่างงาน", "คน") if mode.startswith("จำนวน") else ("rate_pct", "อัตราการว่างงาน", "ร้อยละ")
-    td = persons(tr.data)
+    td = persons(sel_.region_trend(b, f.for_trend()).data)   # the whole 2563+ scope; the picked years are shaded
     td["series"] = td["region"]
     if td[col].notna().sum() > 1:
-        _plot(charts.multi_line(td, col, "series", ttl, unit, 0 if col == "u_k" else 2), "reg_trend")
+        cf = (b.availability.get("conflicts") or {}).get("rate", []) if col == "rate_pct" else []
+        lo_t, hi_t = int(td["period_idx"].min()), int(td["period_idx"].max())
+        _plot(charts.multi_line(td, col, "series", ttl, unit, 0 if col == "u_k" else 2, focus=f.focus,
+                                excluded=[r["period_idx"] for r in cf if lo_t <= r["period_idx"] <= hi_t]), "reg_trend")
+        ui.conflict_box(cf, _plabel, lo_t, hi_t, " ของอัตราการว่างงาน")
         ui.chart_caption(tr.source, ui.period_range_text(td), unit, "ดูคำอธิบายด้านบน",
                          "ตั้งแต่ปี 2568 ภาคกลางรวมภาคตะวันออก และภาคใต้รวมใต้ชายแดน เพื่อให้เส้นต่อเนื่อง (จังหวัดชุดเดียวกัน)", _src_url("nso_u_region"))
     else:
@@ -451,7 +457,7 @@ def regional(ctx: Ctx) -> None:
         ui.empty_state(ps.unavailable_reason)
         return
     _plot(charts.province_bar(ps.data, "rate_pct", "อัตราการว่างงาน", "ร้อยละ", top=15), "prov_bar")
-    ui.chart_caption(ps.source, _plabel_full(pidx), "ร้อยละ", "ตามที่ สสช. เผยแพร่ (15 จังหวัดที่อัตราสูงสุดในไตรมาสนี้)",
+    ui.chart_caption(ps.source, _plabel_full(pidx), "ร้อยละ", "ตามที่ สสช. เผยแพร่ (15 จังหวัดที่อัตราสูงสุดในไตรมาสนี้ รวมจังหวัดที่ค่าเท่ากับอันดับสุดท้าย) · ตัวเลขในวงเล็บคืออันดับ เครื่องหมาย = คือค่าเท่ากัน",
                      "ตัวอย่างระดับจังหวัดมีขนาดเล็ก ค่าแกว่งจากการสุ่มสูง ไม่ควรใช้จัดอันดับจังหวัดเพียงไตรมาสเดียว; ค่ารายจังหวัดแกว่งสูง จึงแสดงเป็นแท่ง/ตาราง ส่วนแผนที่ใช้ค่ารายภาค",
                      _src_url("nso_u_province"))
     pt = ps.data[["province", "unemployed_persons", "rate_pct"]].rename(columns={"province": "จังหวัด", "unemployed_persons": "ผู้ว่างงาน (คน)", "rate_pct": "อัตราการว่างงาน (%)"})
@@ -635,13 +641,6 @@ def methodology(ctx: Ctx) -> None:
         })
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True, column_config={
         "ลิงก์ต้นทาง": st.column_config.LinkColumn("ลิงก์ต้นทาง"), "หน้าชุดข้อมูล": st.column_config.LinkColumn("หน้าชุดข้อมูล")})
-    mfa = b.availability.get("master_file")
-    if mfa is not None:
-        ui.notice("warn" if not mfa.get("ok") else "info",
-                  "<b>ไฟล์ที่ได้รับจากเพื่อน</b> (<code>data/external/final_labor_master_data.csv</code>, ไม่ได้ดึงจากต้นทางโดยตรง) ใช้เฉพาะคอลัมน์ "
-                  "<b>จำนวนผู้มีงานทำ (คน)</b> ใช้ได้ " + f"{mfa.get('rows', 0):,}" + " แถวหลังตรวจสอบ ตรวจเทียบกับตาราง สสช. LFS_02_20535_1 ทุกครั้งที่โหลด "
-                  "ส่วนค่าจ้างและอัตราต่าง ๆ ในไฟล์ไม่ถูกนำมาใช้เพราะดึงตรงจาก สสช. แล้ว (รายละเอียดใน docs/SOURCE_VERIFICATION.md ข้อ 8)",
-                  "ข้อมูลจากไฟล์ภายนอก")
     meta = [{"ชื่อ": v.get("title") or "—", "รหัส": k, "หน่วยงาน": v.get("organization") or "—", "ปีแรก": v.get("first_year_of_data") or "—",
              "ปีล่าสุด": v.get("last_year_of_data") or "—", "ข้อมูลปรับปรุงล่าสุด (ผู้เผยแพร่)": v.get("last_updated_date") or "—",
              "ข้อมูลกำกับ แก้ไขล่าสุด (data.go.th)": (v.get("metadata_modified") or "—")[:10]} for k, v in ctx.ckan.items() if "error" not in v]

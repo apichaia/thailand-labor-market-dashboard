@@ -13,7 +13,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 DATA_RAW = BASE_DIR / "data" / "raw"
 DATA_PROCESSED = BASE_DIR / "data" / "processed"
-LOG_DIR = BASE_DIR / "logs"
+LOG_DIR = Path(os.environ.get("TUI_LOG_DIR") or BASE_DIR / "logs")   # tests point this elsewhere so they never write into the app log
 MANIFEST_PATH = DATA_RAW / "manifest.json"
 
 
@@ -55,7 +55,8 @@ RATE_TOL_PP = 0.06
 EMP_AGREE_TOL_PP = 0.05   # national employment rate published by 3 tables must agree within 0.05 percentage points
 WAGE_AGREE_TOL = 0.01     # national average wage published by 3 tables must agree within 1 %
 WAGE_JUMP_TOL = 0.10      # ... and may not jump more than 10 % from the median of its 5-quarter neighbourhood
-JOINT_START_BE, JOINT_END_BE = 2561, 2568   # default window for the employment/wage page
+SCOPE_START_BE = 2563     # the dashboard shows data from this year on (2561-2562 lack most regional wages; 2563+ is checked against NSO tables)
+JOINT_START_BE, JOINT_END_BE = 2563, 2569   # default window for the employment/wage page
 
 BE_OFFSET = 543  # Buddhist Era -> Common Era
 MIN_BE, MAX_BE = 2500, 2700
@@ -148,6 +149,12 @@ SOURCES: tuple[SourceSpec, ...] = (
         org="สำนักงานสถิติแห่งชาติ (สสช.)", kind="nso_csv", url=_nso("LFS_02_20535_10"),
         landing_url=DG + "0706_02_0002", unit="พันคน", frequency="รายไตรมาส",
         role="ตัวหารของอัตราการว่างงานรายระดับการศึกษา", ckan_package="0706_02_0002",
+    ),
+    SourceSpec(
+        key="nso_emp_age_sex", title="จำนวนผู้มีงานทำ จำแนกตามกลุ่มอายุ เพศ",
+        org="สำนักงานสถิติแห่งชาติ (สสช.)", kind="nso_csv", url=_nso("OS_02_0002_01"),
+        landing_url=DG + "0706_02_0002", unit="พันคน", frequency="รายไตรมาส",
+        role="จำนวนผู้มีงานทำตามกลุ่มอายุ (หน้า กลุ่มแรงงาน)", ckan_package="0706_02_0002",
     ),
     SourceSpec(
         key="nso_rate_old", title="อัตราการว่างงาน จำแนกตามภาค เขตการปกครอง เพศ กลุ่มอายุ (2556–2568)",

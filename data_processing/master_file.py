@@ -1,8 +1,7 @@
-"""Employed persons (พันคน) from the merged file a friend sent: ``data/external/final_labor_master_data.csv``.
+"""Employed persons (พันคน) by region x sex x age group, from NSO table OS_02_0002_01 (dataset 0706_02_0002 on data.go.th).
 
-Only the ``emp_headcount`` column is used (wages, employment rates and unemployment rates are pulled straight from NSO).
-The file has no provenance, and has numbered labels ('1) กรุงเทพมหานคร'), a 'Total' region, rows with quarter 0 and repeated
-keys, so every number is checked before use:
+The cleaner also accepts the older compiled file (numbered labels such as '1) กรุงเทพมหานคร', a 'Total' region, rows with quarter 0 and
+repeated keys), so every number is checked before use:
 * labels are normalised, quarter 0 rows (no quarter) and repeated keys are dropped (reported);
 * the sum over ages for each quarter x region x sex must match NSO's employed-persons table (LFS_02_20535_1) within 1 %.
   Groups that do not match are dropped; years without that NSO table (before 2563) cannot be checked and are labelled so.
@@ -20,7 +19,7 @@ from data_processing import clean as c
 from data_processing import normalize as nz
 from data_processing import validation as v
 
-TABLE = "master_file"
+TABLE = "nso_emp_age_sex"   # same key as the source in config.SOURCES
 AGES = ["15-19 ปี", "20-24 ปี", "25-29 ปี", "30-34 ปี", "35-39 ปี", "40-49 ปี", "50-59 ปี", "60 ปีขึ้นไป"]
 
 
@@ -41,7 +40,7 @@ def clean_headcount(raw: pd.DataFrame, table: str = TABLE):
     n_all = len(df)
     df = df.assign(emp_k=pd.to_numeric(df["emp_headcount"], errors="coerce")).dropna(subset=["emp_k"])
     if nz.year_era(df["year"]) != "BE":
-        rep.add(v.Issue("error", "year_era", table, "ปีในไฟล์ไม่ใช่ พ.ศ. ทั้งหมด"))
+        rep.add(v.Issue("error", "year_era", table, "ปีในตารางไม่ใช่ พ.ศ. ทั้งหมด"))
         return c._fail(rep)
     q0 = pd.to_numeric(df["quarter"], errors="coerce").fillna(0).astype(int) == 0
     if q0.any():
@@ -71,7 +70,7 @@ def clean_headcount(raw: pd.DataFrame, table: str = TABLE):
         df = df[df["_bad"].isna()].drop(columns="_bad").drop_duplicates(keys)
     df = df[["year_be", "quarter", "period_idx", "period_label", "date", "region", "area", "sex", "age_group", "emp_k"]]
     df = c._add_region_basis(df) if len(df) else df
-    rep.add(v.Issue("info", "rows", table, f"ใช้ได้ {len(df):,} จาก {n_all:,} แถวของไฟล์ (เฉพาะคอลัมน์จำนวนผู้มีงานทำ)", len(df)))
+    rep.add(v.Issue("info", "rows", table, f"ใช้ได้ {len(df):,} จาก {n_all:,} แถวของตาราง", len(df)))
     if df.empty:
         rep.add(v.Issue("error", "empty", table, "ไม่มีแถวที่ใช้ได้หลังตรวจสอบ"))
         return c._fail(rep)
@@ -98,7 +97,7 @@ def reconcile_with_nso(df: pd.DataFrame, nso_emp: pd.DataFrame | None, table: st
     if len(bad):
         per = sorted({int(i[0]) for i in bad})
         rep.add(v.Issue("warning", "reconciliation", table,
-                        f"จำนวนผู้มีงานทำในไฟล์ไม่ตรงกับ สสช. (LFS_02_20535_1) {len(bad)} กลุ่ม (ไตรมาส×ภาค×เพศ) ใน "
+                        f"จำนวนผู้มีงานทำในตาราง OS_02_0002_01 ไม่ตรงกับ สสช. (LFS_02_20535_1) {len(bad)} กลุ่ม (ไตรมาส×ภาค×เพศ) ใน "
                         + ", ".join(nz.period_label(p // 4, p % 4 + 1) for p in per[:4]) + " — ไม่ใช้กลุ่มเหล่านั้น", len(bad), {"periods": per}))
     unchecked_idx = j.index[j["r"].isna()]
     keep = mine.index.difference(pd.Index(bad))
@@ -136,7 +135,7 @@ def plausibility(emp_national: pd.DataFrame, national: pd.DataFrame, table: str 
         return []
     gap = ((j["emp_k"] + j["u_k"] - j["lf_k"]).abs() / j["lf_k"]) * 100
     out = [v.Issue("info", "plausibility", table,
-                   f"ผู้มีงานทำ (ไฟล์) + ผู้ว่างงาน เทียบกำลังแรงงานรวมของ สสช. ต่างกันเฉลี่ย {gap.median():.2f}% สูงสุด {gap.max():.2f}% ({len(j)} ไตรมาส) "
+                   f"ผู้มีงานทำ (OS_02_0002_01) + ผู้ว่างงาน เทียบกำลังแรงงานรวมของ สสช. ต่างกันเฉลี่ย {gap.median():.2f}% สูงสุด {gap.max():.2f}% ({len(j)} ไตรมาส) "
                    "ส่วนต่างส่วนใหญ่คือผู้รอฤดูกาล ซึ่งนับในกำลังแรงงานแต่ไม่ใช่ผู้มีงานทำหรือผู้ว่างงาน", len(j))]
     bad = gap[gap > 2.0]
     if len(bad):
