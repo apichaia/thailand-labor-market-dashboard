@@ -401,6 +401,7 @@ button:active { transform: scale(.97); }
 .mascot-fixed.look .mc { animation: lm-look 1.8s ease-in-out; transform-origin: 50% 100%; }
 @keyframes lm-point { 0%, 100% { transform: rotate(-30deg); } 50% { transform: rotate(-4deg); } }
 @keyframes lm-nod { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-3deg) translateY(1px); } }
+.mascot-fixed.explain .mf-pos { pointer-events: auto; cursor: pointer; }   /* only while it explains a chart: a click on it makes it stop */
 .mascot-fixed.explain .mc { animation: lm-nod 1.1s ease-in-out infinite; transform-origin: 50% 100%; }
 .mascot-fixed.explain .mc-armR { animation: lm-point .9s ease-in-out infinite; }
 .mascot-fixed.sleep .mc-eyes { animation: none; transform: scaleY(.08); }

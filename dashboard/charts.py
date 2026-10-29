@@ -299,6 +299,14 @@ def scatter_gdp(df: pd.DataFrame, xcol: str, ycol: str, ytitle: str, yunit: str)
     return fig
 
 
+# one clearly different hue per reason (the pinks of the theme palette were too close to tell apart in a stack); neighbours in the stack contrast
+REASON_COLORS = {
+    "ถูกให้ออก/ไล่ออก/ปลดออก": "#FF6B6B", "นายจ้างเลิก/หยุด/ปิดกิจการ": "#E83C91", "ลาออก": "#FF9F43", "หมดสัญญาจ้างงาน": "#B58CF0",
+    "หมดสัญญาจ้างแรงงาน": "#55D8C1", "อื่นๆ": "#6CB8F0", "เลิก/หยุด/ปิดกิจการ": "#FCD34D",
+}
+_REASON_SPARE = ["#FF6B6B", "#E83C91", "#FF9F43", "#B58CF0", "#55D8C1", "#6CB8F0", "#FCD34D"]
+
+
 def stacked_reasons(df: pd.DataFrame) -> go.Figure:
     d = df.sort_values("period_idx")
     base = _full(d)
@@ -306,7 +314,7 @@ def stacked_reasons(df: pd.DataFrame) -> go.Figure:
     cats = list(dict.fromkeys(d["category"]))
     for i, cat in enumerate(cats):
         sub = base.merge(d[d["category"] == cat][["period_idx", "value_k"]], on="period_idx", how="left")
-        fig.add_trace(go.Bar(x=sub["x"], y=sub["value_k"] * 1000.0, name=cat, marker_color=theme.SERIES[i % len(theme.SERIES)],
+        fig.add_trace(go.Bar(x=sub["x"], y=sub["value_k"] * 1000.0, name=cat, marker=dict(color=REASON_COLORS.get(cat, _REASON_SPARE[i % len(_REASON_SPARE)]), line=dict(color="white", width=1)),
                              hovertemplate="<b>%{x}</b><br>" + cat + ": %{y:,.0f} คน<extra></extra>"))
     fig.update_layout(barmode="stack")
     style(fig, height=460, ytitle="ผู้ว่างงานที่เคยทำงาน (คน)")
@@ -325,15 +333,16 @@ def sso_bar(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def donut(df: pd.DataFrame, label: str, value: str, unit: str, centre_title: str, decimals: int = 1, height: int = 300) -> go.Figure:
+def donut(df: pd.DataFrame, label: str, value: str, unit: str, centre_title: str, decimals: int = 1, height: int = 300,
+          colors: dict | None = None, label_color: str = "white") -> go.Figure:
     """Share of a total split in two or three groups; the total sits in the hole."""
-    colors = {"ชาย": theme.PRIMARY, "หญิง": theme.ACCENT}
+    colors = colors or {"ชาย": theme.PRIMARY, "หญิง": theme.ACCENT}
     d = df.dropna(subset=[value])
     total = d[value].sum()
     fig = go.Figure(go.Pie(
         labels=d[label], values=d[value], hole=0.62, sort=False, direction="clockwise",
         marker=dict(colors=[colors.get(x, theme.MIDBLUE) for x in d[label]], line=dict(color="white", width=2)),
-        textinfo="percent", textfont=dict(size=13, color="white"),
+        textinfo="percent", textfont=dict(size=13, color=label_color),
         hovertemplate="<b>%{label}</b><br>%{value:,." + str(decimals) + "f} " + unit + " (%{percent})<extra></extra>"))
     fig.update_layout(
         font=FONT, height=height, paper_bgcolor="rgba(0,0,0,0)", margin=dict(l=8, r=8, t=16, b=52), showlegend=True,

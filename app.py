@@ -13,7 +13,7 @@ import streamlit as st
 
 import config
 from analytics import selectors as sel_
-from dashboard import fx, intro, mascot
+from dashboard import fx, mascot
 from dashboard import components as ui
 from dashboard import hub, overview, pages, theme
 from dashboard.report import build_summary_markdown
@@ -48,9 +48,6 @@ def _setup_logging() -> None:
 
 _setup_logging()
 st.markdown(theme.CSS + theme.CSS_V2 + theme.CSS_FX + theme.CSS_BENTO + theme.CSS_3D + theme.CSS_DARK, unsafe_allow_html=True)
-from data_processing import intro_payload   # noqa: E402
-
-intro.mount(intro_payload.read())   # the film before the dashboard (skipped when there is no data yet or no internet)
 fx.mount(st.session_state.get("snd_on", False), st.session_state.get("dark_on", False))   # outside the sidebar: it must also run while the sidebar is collapsed
 if st.session_state.get("mascot_on", True):
     st.markdown('<div class="mascot-fixed"><div class="mf-pos"><div class="mf-bubble"></div><div class="mf-pop"><div class="mf-flip">' + mascot.happy3d() + '</div></div></div></div>', unsafe_allow_html=True)   # pops up when the viewer scrolls down to the charts (CSS only)
@@ -227,7 +224,6 @@ with st.sidebar:
         st.download_button("รายงาน", build_summary_markdown(ctx).encode("utf-8"), file_name="labour_market_summary.md", mime="text/markdown",
                            icon=":material/download:", width="stretch", help="ดาวน์โหลดรายงานสรุป (.md) ตามตัวกรองปัจจุบัน")
     with st.expander("ตั้งค่า", icon=":material/settings:"):
-        st.button("เล่นอินโทรอีกครั้ง", icon=":material/play_circle:", width="stretch", on_click=intro.replay, help="ดูหน้าอินโทรก่อนเข้าแดชบอร์ดอีกครั้ง")
         st.toggle("โหมดมืด", key="dark_on", value=False, help="เปลี่ยนเป็นธีมสีเข้ม ถนอมสายตาเวลาใช้งานตอนกลางคืน")
         st.toggle("เสียงเอฟเฟกต์", key="snd_on", value=False, help="เสียงคลิกเบา ๆ เมื่อกดแท็บ ปุ่ม และภาคบนแผนที่ (ปิดไว้ตามค่าเริ่มต้น)")
         st.toggle("มาสคอตเดินบนหน้าจอ", key="mascot_on", value=True, help="ปิดเพื่อไม่ให้ตัวการ์ตูนบังกราฟ (บนมือถือซ่อนไว้เสมอ)")

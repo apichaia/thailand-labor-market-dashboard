@@ -103,3 +103,13 @@ def test_shade_excluded_merges_neighbouring_quarters_into_one_band():
     charts.shade_excluded(fig, 100, 120, [105, 106, 107, 110, 999])      # 999 is outside the chart
     assert len(fig.layout.shapes) == 2
     assert (fig.layout.shapes[0].x0, fig.layout.shapes[0].x1) == (4.5, 7.5)
+
+
+def test_donut_accepts_colours_and_keeps_its_defaults():
+    import pandas as pd
+    from dashboard import charts
+
+    df = pd.DataFrame({"เพศ": ["ชาย", "หญิง"], "v": [60.0, 40.0]})
+    custom = charts.donut(df, "เพศ", "v", "คน", "x", 0, colors={"ชาย": "#6CB8F0", "หญิง": "#FF6FB5"}, label_color="#43334C")
+    assert list(custom.data[0].marker.colors) == ["#6CB8F0", "#FF6FB5"] and custom.data[0].textfont.color == "#43334C"
+    assert list(charts.donut(df, "เพศ", "v", "คน", "x", 0).data[0].marker.colors)[0] == charts.theme.PRIMARY

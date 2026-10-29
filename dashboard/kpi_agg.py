@@ -63,6 +63,24 @@ def unemployment_rate(unemployed: dict[int, float], labour_force: dict[int, floa
     return a
 
 
+def region_unemployment(rs: pd.DataFrame, qs: list[int], excluded=()) -> pd.DataFrame:
+    """Unemployment rate of each region over the selected quarters = sum(unemployed) / sum(labour force) x 100.
+
+    Only quarters that have both numbers for that region (and are not in ``excluded``, the quarters whose tables disagree) are used; a region with none is left out.
+    Columns: region, rate_pct, n_used (quarters used), used (the quarters)."""
+    cols = ["region", "rate_pct", "n_used", "used"]
+    if rs is None or len(rs) == 0 or not {"u_k", "lf_k", "region", "period_idx"} <= set(rs.columns):
+        return pd.DataFrame(columns=cols)
+    skip = {int(q) for q in excluded}
+    rows = []
+    for region, g in rs.groupby("region"):
+        u, lf = to_dict(g, "u_k"), to_dict(g, "lf_k")
+        a = weighted_rate(u, lf, [q for q in qs if q not in skip])
+        if a.value is not None:
+            rows.append({"region": region, "rate_pct": a.value, "n_used": len(a.used), "used": a.used})
+    return pd.DataFrame(rows, columns=cols)
+
+
 def simple_mean(vals: dict[int, float], qs: list[int]) -> Agg:
     used = [q for q in qs if q in vals]
     if not used:

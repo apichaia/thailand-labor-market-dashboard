@@ -371,23 +371,127 @@ export default function(component) {
             const star = Object.keys(fx.helpKey).find((n) => n.endsWith('*') && k.startsWith(n.slice(0, -1)));
             return star ? fx.helpKey[star] : '';
         }
-        function explainText(plot) {
+
+        // ---- a plain-language summary read from the data the chart really holds (never invented; nothing is shown when the chart has too few values) ----
+        const arr = (a) => (a && a._inputArray) ? Array.from(a._inputArray) : Array.from(a || []);   // Plotly may hand over numbers as packed binary: use the decoded copy
+        const isNum = (v) => typeof v === 'number' && isFinite(v);
+        const axTitle = (a) => (a && a.title && (a.title.text || (typeof a.title === 'string' ? a.title : ''))) || '';
+        const clean = (t) => String(t).replace(/<br>/g, ' ').replace(/\s+/g, ' ').trim();
+        const bare = (t) => clean(t).replace(/\s*\([^)]*\)\s*$/, '');
+        function unitOf(t) { const m = clean(t).match(/\(([^)]+)\)\s*$/); return m ? m[1] : ''; }
+        function fnum(v) { const a = Math.abs(v); if (a >= 1e6) return (v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ล้าน'; return v.toLocaleString('en-US', { maximumFractionDigits: a >= 1000 ? 0 : 2 }); }
+        function withUnit(v, unit) { const n = fnum(v); return unit === 'ร้อยละ' ? n + '%' : (unit ? n + ' ' + unit : n); }
+        function change(a, b, unit) {
+            const d = b - a;
+            if (unit === 'ร้อยละ') return Math.abs(d) < 0.05 ? 'ใกล้เคียงเดิม' : (d > 0 ? 'เพิ่มขึ้น ' : 'ลดลง ') + fnum(Math.abs(d)) + ' จุดร้อยละ';
+            const pct = a ? d / Math.abs(a) * 100 : 0;
+            return Math.abs(pct) < 1 ? 'ใกล้เคียงเดิม' : (d > 0 ? 'เพิ่มขึ้น ' : 'ลดลง ') + fnum(Math.abs(pct)) + '%';
+        }
+        function sumLines(ts, unit) {
+            const rows = ts.map((t) => { const xs = arr(t.x), ys = arr(t.y), pts = []; ys.forEach((y, i) => { if (isNum(y)) pts.push([clean(xs[i]), y]); }); return { name: t.name || '', pts }; }).filter((r) => r.pts.length >= 2);
+            if (!rows.length) return '';
+            const one = (r) => {
+                const f = r.pts[0], l = r.pts[r.pts.length - 1]; let pk = f, tr = f;
+                r.pts.forEach((q) => { if (q[1] > pk[1]) pk = q; if (q[1] < tr[1]) tr = q; });
+                return (r.name ? r.name + ': ' : '') + 'เริ่มที่ ' + withUnit(f[1], unit) + ' (' + f[0] + ') ล่าสุด ' + withUnit(l[1], unit) + ' (' + l[0] + ') ' + change(f[1], l[1], unit)
+                    + ' สูงที่สุดที่ ' + pk[0] + ' (' + withUnit(pk[1], unit) + ') ต่ำที่สุดที่ ' + tr[0] + ' (' + withUnit(tr[1], unit) + ')';
+            };
+            if (rows.length === 1) return one(rows[0]) + '.';
+            const last = rows.map((r) => ({ name: r.name, x: r.pts[r.pts.length - 1][0], v: r.pts[r.pts.length - 1][1] })).sort((a, b) => b.v - a.v);
+            const hi = last[0], lo = last[last.length - 1];
+            return 'ค่าล่าสุดของ ' + hi.name + ' สูงที่สุด (' + withUnit(hi.v, unit) + ', ' + hi.x + ') และ ' + lo.name + ' ต่ำที่สุด (' + withUnit(lo.v, unit) + ', ' + lo.x + ') ส่วนเส้นอื่นอยู่ระหว่างสองค่านี้.';
+        }
+        function sumBars(ts, lay, horizontal, stacked) {
+            const unit = unitOf(axTitle(horizontal ? lay.xaxis : lay.yaxis));
+            const cat = (t) => arr(horizontal ? t.y : t.x).map(clean), val = (t) => arr(horizontal ? t.x : t.y);
+            if (ts.length === 1) {
+                const c = cat(ts[0]), v = val(ts[0]), pts = c.map((n, i) => [n, v[i]]).filter((q) => isNum(q[1]));
+                if (pts.length < 2) return '';
+                if (!horizontal && pts.some((q) => /\//.test(q[0]) || /ไตรมาส/.test(q[0]))) return sumLines([{ name: ts[0].name, x: pts.map((q) => q[0]), y: pts.map((q) => q[1]) }], unit);
+                const sorted = pts.slice().sort((a, b) => b[1] - a[1]), top = sorted.slice(0, 3);
+                return top[0][0] + ' สูงที่สุด (' + withUnit(top[0][1], unit) + ')' + (top.length > 1 ? ' รองลงมา ' + top.slice(1).map((q) => q[0] + ' (' + withUnit(q[1], unit) + ')').join(' และ ') : '')
+                    + ' ต่ำที่สุดคือ ' + sorted[sorted.length - 1][0] + ' (' + withUnit(sorted[sorted.length - 1][1], unit) + ').';
+            }
+            const cats = cat(ts[0]), ys = ts.map(val);
+            const names = ts.map((t) => t.name || '');
+            const sums = ys.map((a) => a.reduce((s2, q) => s2 + (isNum(q) ? q : 0), 0)), grand = sums.reduce((a, b) => a + b, 0);
+            if (!grand) return '';
+            const order = sums.map((v, i) => i).sort((a, b) => sums[b] - sums[a]);
+            const share = (i) => Math.round(sums[i] / grand * 100) + '%';
+            if (stacked) {
+                const tot = cats.map((_, i) => ys.reduce((s2, a) => s2 + (isNum(a[i]) ? a[i] : 0), 0));
+                const hi = tot.indexOf(Math.max(...tot)), lo = tot.indexOf(Math.min(...tot));
+                return 'ยอดรวมสูงที่สุดคือ ' + cats[hi] + ' (' + withUnit(tot[hi], unit) + ') ต่ำที่สุดคือ ' + cats[lo] + ' (' + withUnit(tot[lo], unit) + ') ส่วนที่ใหญ่ที่สุดโดยรวมคือ '
+                    + names[order[0]] + ' (' + share(order[0]) + ' ของทั้งหมด) รองลงมาคือ ' + names[order[1]] + ' (' + share(order[1]) + ').';
+            }
+            if (ts.length === 2) {
+                let a = 0, b = 0, n = 0;
+                cats.forEach((_, i) => { if (isNum(ys[0][i]) && isNum(ys[1][i])) { n++; if (ys[0][i] > ys[1][i]) a++; else if (ys[1][i] > ys[0][i]) b++; } });
+                if (n) return names[0] + ' สูงกว่า' + names[1] + ' ใน ' + a + ' จาก ' + n + ' กลุ่ม' + (b ? ' ส่วน' + names[1] + 'สูงกว่าใน ' + b + ' กลุ่ม' : '') + '.';
+            }
+            return names[order[0]] + ' มีค่ารวมมากที่สุด (' + share(order[0]) + ' ของทั้งหมด) และ ' + names[order[order.length - 1]] + ' น้อยที่สุด (' + share(order[order.length - 1]) + ').';
+        }
+        function sumScatter(ts, lay) {
+            const pts = [];
+            ts.forEach((t) => { const xs = arr(t.x), ys = arr(t.y); xs.forEach((a, i) => { if (isNum(a) && isNum(ys[i])) pts.push([a, ys[i]]); }); });
+            if (pts.length < 8) return '';
+            const n = pts.length, mx = pts.reduce((s2, q) => s2 + q[0], 0) / n, my = pts.reduce((s2, q) => s2 + q[1], 0) / n;
+            let sxy = 0, sxx = 0, syy = 0;
+            pts.forEach((q) => { sxy += (q[0] - mx) * (q[1] - my); sxx += (q[0] - mx) ** 2; syy += (q[1] - my) ** 2; });
+            if (!sxx || !syy) return '';
+            const r = sxy / Math.sqrt(sxx * syy), a = Math.abs(r);
+            const xn = bare(axTitle(lay.xaxis)) || 'ค่าบนแกนนอน', yn = bare(axTitle(lay.yaxis)) || 'ค่าบนแกนตั้ง';
+            if (a < 0.2) return 'จุด ' + n + ' จุดกระจายไม่เป็นแนว แปลว่า ' + xn + ' กับ ' + yn + ' แทบไม่เคลื่อนไหวสัมพันธ์กัน (r = ' + r.toFixed(2) + ').';
+            const lv = a >= 0.7 ? 'ค่อนข้างมาก' : (a >= 0.4 ? 'ปานกลาง' : 'เล็กน้อย');
+            return 'จุด ' + n + ' จุดเรียงเป็นแนว' + (r > 0 ? 'ขึ้น' : 'ลง') + ' ' + lv + ' คือเมื่อ ' + xn + ' สูงขึ้น ' + yn + ' มัก' + (r > 0 ? 'สูงขึ้นตาม' : 'ต่ำลง') + ' (r = ' + r.toFixed(2) + ') แต่ไม่ได้แปลว่าสิ่งหนึ่งเป็นสาเหตุของอีกสิ่ง.';
+        }
+        function sumRank(card) {
+            const rows = Array.from(card.querySelectorAll('.rklist .rk')).map((e) => { const n = e.querySelector('.rk-t b'), v = e.querySelector('.rk-t span'); return n && v ? [n.textContent.trim(), v.textContent.trim()] : null; }).filter(Boolean);
+            if (rows.length < 2) return '';
+            return rows[0][0] + ' สูงที่สุด (' + rows[0][1] + ') รองลงมา ' + rows.slice(1, 3).map((q) => q[0] + ' (' + q[1] + ')').join(' และ ') + ' ต่ำที่สุดคือ ' + rows[rows.length - 1][0] + ' (' + rows[rows.length - 1][1] + ').';
+        }
+        function sumPie(t) {
+            const l = arr(t.labels).map(clean), v = arr(t.values), tot = v.reduce((a, q) => a + (isNum(q) ? q : 0), 0);
+            if (!tot || l.length < 2) return '';
+            const rows = l.map((n, i) => [n, v[i]]).filter((q) => isNum(q[1])).sort((a, b) => b[1] - a[1]);
+            return rows.map((q) => q[0] + ' ' + fnum(q[1]) + ' (' + Math.round(q[1] / tot * 100) + '%)').join(' และ ') + ' จากทั้งหมด ' + fnum(tot) + '.';
+        }
+        function plainSummary(el) {
+            const gd = el && el.querySelector ? el.querySelector('.js-plotly-plot') : null;
+            if (!gd || !gd.data) return el && el.querySelector ? sumRank(el.closest('[class*="st-key-card_"]') || el) : '';
+            const pie = gd.data.find((d) => d.type === 'pie');
+            if (pie) return sumPie(pie);
+            const lay = gd.layout || {}, all = gd.data.filter((d) => d.hoverinfo !== 'skip' && d.visible !== false && d.x && d.y && (d.name || gd.data.length === 1));
+            const bars = all.filter((d) => d.type === 'bar');
+            if (bars.length) return sumBars(bars, lay, bars[0].orientation === 'h', lay.barmode === 'stack');
+            const lines = all.filter((d) => d.type === 'scatter' && /lines/.test(d.mode || ''));
+            if (lines.length) return sumLines(lines.slice(0, 8), unitOf(axTitle(lay.yaxis)));
+            const dots = all.filter((d) => d.type === 'scatter' && /markers/.test(d.mode || ''));
+            return dots.length ? sumScatter(dots, lay) : '';
+        }
+        function howText(plot) {
             const card = plot.closest('[class*="st-key-card_"]');
             const ttl = card && card.querySelector('.card-title') ? card.querySelector('.card-title').textContent.trim() : '';
             const kh = keyHelp(chartKey(plot));
-            if (kh) return (ttl ? ttl + ': ' : '') + kh;
-            if (ttl && fx.help[ttl]) return ttl + ': ' + fx.help[ttl];
+            if (kh) return [ttl, kh];
+            if (ttl && fx.help[ttl]) return [ttl, fx.help[ttl]];
             const gd = plot.querySelector('.js-plotly-plot');
             const lay = gd && gd.layout ? gd.layout : {};
             const tx = (a) => (a && a.title && (a.title.text || (typeof a.title === 'string' ? a.title : ''))) || '';
             const y = tx(lay.yaxis), xx = tx(lay.xaxis);
             const names = (gd && gd.data ? gd.data : []).filter((d) => d.name && d.showlegend !== false && d.hoverinfo !== 'skip').map((d) => d.name);
             const uniq = Array.from(new Set(names)).slice(0, 5);
-            let st = (ttl ? ttl + ': ' : '') + 'กราฟนี้แสดง';
+            let st = 'กราฟนี้แสดง';
             st += y ? ' ' + y : ' ค่าตามที่ระบุในกราฟ';
             if (xx) st += ' เทียบกับ ' + xx;
             if (uniq.length > 1) st += ' แยกเป็น ' + uniq.join(', ');
-            return st + ' ชี้ที่จุดหรือแท่งเพื่อดูตัวเลข ช่องว่าง = ไม่มีข้อมูลที่เชื่อถือได้';
+            return [ttl, st + ' ชี้ที่จุดหรือแท่งเพื่อดูตัวเลข ช่องว่าง = ไม่มีข้อมูลที่เชื่อถือได้'];
+        }
+        function explainText(plot) {
+            const [ttl, how] = howText(plot);
+            let sm = '';
+            try { sm = plainSummary(plot); } catch (err) { sm = ''; }
+            return (ttl ? ttl + ': ' : '') + (sm ? 'สรุปง่าย ๆ — ' + sm + ' · วิธีอ่านกราฟ: ' + how : how);
         }
         function endExplain() {
             const p = parts();
@@ -433,13 +537,17 @@ export default function(component) {
                 if (cx + bw / 2 > innerWidth - 12) center -= (cx + bw / 2) - (innerWidth - 12);
                 if (cx - bw / 2 < lo) center += lo - (cx - bw / 2);
                 place(p, bw, center);
-                fx.explainTimer = setTimeout(endExplain, hold || 11000);
+                fx.explainTimer = setTimeout(endExplain, hold || Math.min(32000, 9000 + text.length * 60));
             };
             ghostTo(p, g.tx, g.nb, arrive, tm);           // it vanishes and shows up on the card's edge
         };
         document.addEventListener('click', (e) => {
             const tgt = e.target;
-            if (!tgt || !tgt.closest || tgt.closest('.mascot-fixed')) return;
+            if (!tgt || !tgt.closest) return;
+            if (tgt.closest('.mascot-fixed')) {                // a click on the mascot while it explains a chart: it stops and goes back down
+                if (fx.busy && fx.target) endExplain();
+                return;
+            }
             const plot = tgt.closest('[data-testid="stPlotlyChart"]');
             if (plot) { fx.explain(plot); return; }
             const title = tgt.closest('.card-title') || tgt.closest('.rklist');
@@ -501,7 +609,8 @@ CHART_HELP = {
     "แผนที่ตลาดแรงงานรายภูมิภาค": "แต่ละสีคือหนึ่งภูมิภาค ตัวเลขอยู่ในรายการสีข้างแผนที่ คลิกที่ภาคเพื่อซูมและดูเฉพาะภาคนั้น",
     "แนวโน้มรายไตรมาส": "เส้นแสดงค่าของตัวชี้วัดที่เลือกในแต่ละไตรมาส ช่องว่างในเส้นคือไตรมาสที่ไม่มีค่าที่เชื่อถือได้ ระบบไม่เติมค่าให้",
     "ค่าจ้างชาย-หญิงตามกลุ่มอายุ": "แท่งทึบคือชาย แท่งลายคือหญิง เทียบค่าจ้างเฉลี่ยต่อเดือนในแต่ละกลุ่มอายุ เป็นข้อมูลระดับประเทศ",
-    "ภูมิภาคที่อัตราการว่างงานสูงสุด": "เรียงอัตราการว่างงานของ 5 ภาคจากสูงไปต่ำ แท่งยาวเทียบกับภาคที่สูงที่สุด ภาคที่ไม่มีค่าที่ตรวจสอบแล้วจะไม่ถูกจัดอันดับ",
+    "ภูมิภาคที่อัตราการว่างงานสูงสุด": "เรียงอัตราการว่างงานของแต่ละภาคตามปีและไตรมาสที่เลือกจากสูงไปต่ำ คิดจากผู้ว่างงานรวมหารกำลังแรงงานรวม ไม่ใช่ค่าเฉลี่ยเปอร์เซ็นต์ แท่งยาวเทียบกับภาคที่สูงที่สุด ภาคที่ไม่มีค่าที่ตรวจสอบแล้วจะไม่ถูกจัดอันดับ",
+    "ผู้ว่างงานแยกตามเพศ": "วงกลมแบ่งตามเพศ แต่ละส่วนคือสัดส่วนของผู้ว่างงานเฉลี่ยต่อไตรมาสในปีและไตรมาสที่เลือก เลขกลางวงคือผู้ว่างงานรวมสองเพศ",
     "เหตุผลที่ผู้ว่างงานออกจากงานเดิม": "แต่ละแท่งคือหนึ่งไตรมาส แบ่งสีตามเหตุผลที่ผู้ว่างงานที่เคยทำงานออกจากงานเดิม ความสูงรวมคือผู้ว่างงานที่เคยทำงานทั้งหมดในไตรมาสนั้น ข้อมูลชุดนี้มีถึงปี 2565 เท่านั้น",
     "ความสัมพันธ์ระหว่างค่าจ้างกับการว่างงาน": "แต่ละจุดคือหนึ่งไตรมาส เส้นประคือแนวโน้มเชิงเส้น ค่า r บอกว่าสองค่าเคลื่อนไหวสัมพันธ์กันแค่ไหน ไม่ได้บอกว่าค่าหนึ่งเป็นสาเหตุของอีกค่า",
 }

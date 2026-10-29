@@ -282,26 +282,6 @@ def _sexage_period(sa: pd.DataFrame, idx: int) -> int | None:
     return int(ok.index.max()) if len(ok) else None
 
 
-def _period_strip(ctx: Ctx, idx: int) -> None:
-    """One line of chips saying which quarter each part of the page shows; a part older than the cards is marked."""
-    b = ctx.bundle
-    rs = b.get("region_series")
-    map_col = MAP_METRICS[st.session_state.get("ov_map_metric", next(iter(MAP_METRICS)))][0]
-    parts = [("การ์ดตัวชี้วัด", idx), ("แผนที่", _latest_region_period(rs, map_col, idx)),
-             ("ค่าจ้างรายภาค", _latest_region_period(rs, "wage", idx)), ("ค่าจ้างชาย-หญิง", _sexage_period(b.get("lm_sex_age"), idx)),
-             ("อันดับภูมิภาค", _latest_region_period(rs, "rate_pct", idx))]
-    chips = []
-    for name, p in parts:
-        if p is None:
-            chips.append(f'<span class="pchip na">{ui.esc(name)} · ไม่มีข้อมูล</span>')
-        else:
-            old = p < idx
-            chips.append(f'<span class="pchip{" old" if old else ""}" title="{"เก่ากว่าการ์ด เพราะยังไม่มีค่าที่ผ่านการตรวจสอบในไตรมาสที่ใหม่กว่า" if old else ""}">'
-                         f'{ui.esc(name)} · <b>{ui.esc(_plabel(p))}</b></span>')
-    st.markdown('<div class="pstrip"><span class="pstrip-t">ข้อมูลในหน้านี้</span>' + "".join(chips)
-                + '<span class="pstrip-k"><i></i>เก่ากว่าการ์ด</span></div>', unsafe_allow_html=True)
-
-
 _MAP = pages.REGION_MAP
 _show_whole_country = pages.show_whole_country
 
@@ -426,15 +406,20 @@ def _province_scatter_insights(ctx: Ctx, idx: int) -> None:
     with p1:
         with st.container(border=True, key=_ckey()):
             rs = b.get("region_series")
-            p = _latest_region_period(rs, "rate_pct", idx)
-            if p is None:
+            f = ctx.filters
+            qs = kpi_agg.selected_quarters(f, max([idx] + ([int(rs["period_idx"].max())] if rs is not None and len(rs) else [])))
+            cf = [r["period_idx"] for r in (b.availability.get("conflicts") or {}).get("rate", [])]
+            rr = kpi_agg.region_unemployment(rs, qs, cf)
+            if rr.empty:
                 _card_title("ภูมิภาคที่อัตราการว่างงานสูงสุด")
-                ui.empty_state("ไม่มีอัตราการว่างงานรายภาคที่ผ่านการตรวจสอบ")
+                ui.empty_state("ไม่มีอัตราการว่างงานรายภาคที่ผ่านการตรวจสอบในช่วงที่เลือก")
             else:
-                _card_title("ภูมิภาคที่อัตราการว่างงานสูงสุด", f"จัดอันดับ 5 ภาค · {_plabel(p)}")
-                d = rs[rs["period_idx"] == p].dropna(subset=["rate_pct"])
-                st.markdown(region_rank_html(d, "rate_pct", "%", 2, list(ctx.filters.regions)), unsafe_allow_html=True)
-                st.caption("แท่งเข้ม = ภาคที่เลือกในตัวกรอง" if ctx.filters.regions else "อัตราการว่างงาน = ผู้ว่างงาน ÷ กำลังแรงงาน · ภาคที่ไม่มีค่าที่ตรวจสอบแล้วไม่ถูกจัดอันดับ")
+                used = sorted({q for u_ in rr["used"] for q in u_})
+                _card_title("ภูมิภาคที่อัตราการว่างงานสูงสุด", "จัดอันดับ " + str(len(rr)) + " ภาค · " + kpi_agg.span_text(qs, used, f))
+                st.markdown(region_rank_html(rr, "rate_pct", "%", 2, list(f.regions)), unsafe_allow_html=True)
+                note = "แท่งเข้ม = ภาคที่เลือกในตัวกรอง · " if f.regions else ""
+                st.caption(note + "อัตราของช่วงที่เลือก = ผลรวมผู้ว่างงาน ÷ ผลรวมกำลังแรงงานของภาคนั้น (ไม่เฉลี่ยเปอร์เซ็นต์) · ภาคที่ไม่มีค่าที่ตรวจสอบแล้วไม่ถูกจัดอันดับ"
+                           + ("" if rr["n_used"].nunique() == 1 else " · บางภาคมีจำนวนไตรมาสไม่เท่ากัน"))
     with p2:
         with st.container(border=True, key=_ckey()):
             _card_title("ความสัมพันธ์ระหว่างค่าจ้างกับการว่างงาน", "แต่ละจุดคือหนึ่งไตรมาส")
@@ -446,6 +431,37 @@ def _province_scatter_insights(ctx: Ctx, idx: int) -> None:
             else:
                 _plot_inline(labour_page._scatter_figure(d, "wage", "ค่าจ้างเฉลี่ย", "บาท/เดือน"), "ov_scatter", 390)
                 st.caption(f"ค่าจ้างกับอัตราการว่างงาน{corr_phrase(cs['pearson'])} (r = {cs['pearson']:.2f} · n = {cs['n']} ไตรมาส) · เป็นความสัมพันธ์เชิงสถิติ ไม่ใช่เหตุและผล")
+
+
+def _sex_donut_card(ctx: Ctx) -> None:
+    """Unemployed people by sex over the years/quarters/regions/education picked in the sidebar (the sex filter itself is not applied: the chart splits by sex)."""
+    b, f = ctx.bundle, ctx.filters
+    with st.container(border=True, key=_ckey()):
+        cnt = sel_.breakdown_sex(b, sel_.Filters(f.year_min, f.year_max, f.quarters, f.regions, (), f.edus))
+        if cnt.empty:
+            _card_title("ผู้ว่างงานแยกตามเพศ")
+            ui.empty_state(cnt.unavailable_reason or "ไม่มีข้อมูลผู้ว่างงานรายเพศในช่วงที่เลือก")
+            return
+        pv = pages.persons(cnt.data).pivot_table(index="period_idx", columns="sex", values="u_k", aggfunc="sum")
+        if not {"ชาย", "หญิง"} <= set(pv.columns):
+            _card_title("ผู้ว่างงานแยกตามเพศ")
+            ui.empty_state("ไม่มีข้อมูลครบทั้งสองเพศในช่วงที่เลือก")
+            return
+        pv = pv[["ชาย", "หญิง"]].dropna()           # only quarters that have both sexes, so the two halves cover the same quarters
+        if pv.empty:
+            _card_title("ผู้ว่างงานแยกตามเพศ")
+            ui.empty_state("ไม่มีไตรมาสที่มีข้อมูลครบทั้งสองเพศในช่วงที่เลือก")
+            return
+        qs = kpi_agg.selected_quarters(f, max(int(pv.index.max()), int(cnt.data["period_idx"].max())))
+        used = [int(q) for q in pv.index]
+        _card_title("ผู้ว่างงานแยกตามเพศ", "เฉลี่ยต่อไตรมาส · " + kpi_agg.span_text(qs, used, f))
+        avg = pv.mean()
+        df = pd.DataFrame({"เพศ": ["ชาย", "หญิง"], "ผู้ว่างงาน": [float(avg["ชาย"]), float(avg["หญิง"])]})
+        fig = charts.donut(df, "เพศ", "ผู้ว่างงาน", "คน", "เฉลี่ยต่อไตรมาส", 0, height=360, colors={"ชาย": "#6CB8F0", "หญิง": "#FF6FB5"}, label_color="#43334C")
+        _plot_inline(fig, "ov_sex_donut", 360)
+        tot = float(avg.sum())
+        st.caption(f"ชาย {avg['ชาย']:,.0f} คน ({avg['ชาย'] / tot * 100:.1f}%) · หญิง {avg['หญิง']:,.0f} คน ({avg['หญิง'] / tot * 100:.1f}%) · ค่าเฉลี่ยของผู้ว่างงานต่อไตรมาส "
+                   "ไม่ใช่ผลรวมสะสม" + (" · ตัวกรองเพศไม่ถูกใช้ในกราฟนี้เพราะกราฟนี้แบ่งตามเพศอยู่แล้ว" if f.sex_active else ""))
 
 
 def _reasons_card(ctx: Ctx) -> None:
@@ -469,7 +485,7 @@ def _reasons_card(ctx: Ctx) -> None:
         # a wide card: the legend goes to the right as one column so the bars keep the full height
         fig.update_layout(margin=dict(l=8, r=8, t=12, b=56),
                           legend=dict(orientation="v", xref="paper", x=1.01, xanchor="left", yref="paper", y=0.5, yanchor="middle", font=dict(size=13), tracegroupgap=2))
-        fig.update_yaxes(title_text="คน", rangemode="tozero")
+        fig.update_yaxes(title_text="ผู้ว่างงาน (คน)", rangemode="tozero")
         _plot_inline(fig, "ov_reasons", 430)
         st.caption("ธปท. EC_RL_019 (ที่มา: สสช. สำรวจภาวะการทำงานของประชากร) · เฉพาะผู้ที่เคยทำงาน ไม่รวมผู้เข้าสู่ตลาดแรงงานครั้งแรก · "
                    "บอกเหตุผลที่ออกจากงานเดิมตามที่ผู้ตอบรายงาน ไม่ได้อธิบายว่าเหตุใดเศรษฐกิจโดยรวมจึงมีคนว่างงาน")
@@ -580,10 +596,13 @@ def home(ctx: Ctx) -> None:
         ui.empty_state(sel.unavailable_reason if not sel.empty and sel.unavailable_reason else "ไม่มีข้อมูลในช่วงเวลาและตัวกรองที่เลือก กรุณาขยายช่วงปีหรือกดล้างตัวกรอง")
         return
     _kpi_row(ctx, idx, sel)
-    _period_strip(ctx, idx)
     _map_and_trend(ctx, idx, sel)
     _province_scatter_insights(ctx, idx)
-    _reasons_card(ctx)
+    d1, d2 = st.columns([1, 1.6], gap="small")
+    with d1:
+        _sex_donut_card(ctx)
+    with d2:
+        _reasons_card(ctx)
     # extra sections are built only when asked for: they are heavy, and a folded section used to be computed on every click anyway
     more = st.segmented_control("รายละเอียดเพิ่มเติม", ["เปรียบเทียบ", "แนวโน้ม 3 ตัวชี้วัดและความสัมพันธ์", "เทียบกับเศรษฐกิจ (GDP)"], key="ov_more",
                                 help="เลือกเพื่อเปิดส่วนที่ละเอียดกว่า กดซ้ำเพื่อปิด (ส่วนนี้ไม่ถูกคำนวณจนกว่าจะเปิด เพื่อให้หน้าตอบสนองเร็ว)")

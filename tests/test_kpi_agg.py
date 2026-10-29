@@ -52,3 +52,15 @@ def test_span_text_says_how_many_selected_quarters_were_used():
     assert k.span_text(qs, qs, f) == "พ.ศ. 2563–2564 · ใช้ข้อมูล 6 ไตรมาส"
     assert k.span_text(qs, qs[:4], f).endswith("ใช้ได้ 4 จาก 6 ไตรมาสที่เลือก")
     assert "เฉพาะไตรมาส 1" in k.span_text([2563 * 4, 2564 * 4], [2563 * 4], Filters(2563, 2564, quarters=(1,)))
+
+
+def test_region_unemployment_is_weighted_and_skips_excluded_quarters():
+    import pandas as pd
+    from dashboard import kpi_agg
+
+    rs = pd.DataFrame({"region": ["ก"] * 3 + ["ข"] * 2, "period_idx": [1, 2, 3, 1, 2],
+                       "u_k": [10.0, 20.0, 99.0, 5.0, None], "lf_k": [1000.0, 3000.0, 100.0, 500.0, 500.0]})
+    r = kpi_agg.region_unemployment(rs, [1, 2, 3], excluded=[3]).set_index("region")
+    assert abs(r.loc["ก", "rate_pct"] - 30 / 4000 * 100) < 1e-9 and r.loc["ก", "n_used"] == 2     # sum / sum, quarter 3 left out
+    assert abs(r.loc["ข", "rate_pct"] - 1.0) < 1e-9 and r.loc["ข", "used"] == [1]                  # a quarter without a numerator is not a zero
+    assert kpi_agg.region_unemployment(rs, [9]).empty
