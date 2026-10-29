@@ -9,7 +9,7 @@ APP = Path(__file__).resolve().parents[1] / "app.py"
 SUB = {
     "ภูมิภาค": ("nav_region", ["การว่างงานรายภาค", "ค่าจ้างและการมีงานทำรายภาค"]),
     "กลุ่มแรงงาน": ("nav_pop", ["การศึกษา", "เพศ", "กลุ่มอายุ", "จำนวนผู้มีงานทำ"]),
-    "ที่มาข้อมูล": ("nav_evidence", ["หลักฐานสาเหตุการว่างงาน", "แหล่งข้อมูลและวิธีการ"]),
+    "สาเหตุการว่างงาน": ("nav_factors", ["A. หลักฐานที่วัดได้โดยตรง", "B. ตัวแทน", "C. สมมติฐานที่ต้องการหลักฐานเพิ่ม"]),
 }
 OVERVIEW_SELECTS = {
     "ov_map_metric": ["อัตรามีงานทำ (%)", "อัตราการว่างงาน (%)", "ค่าจ้างเฉลี่ย (บาท)"],
@@ -31,7 +31,7 @@ def test_every_page_and_sub_tab_renders():
         for opt in options:
             _w(at, "selectbox", key).set_value(opt).run()
             assert not at.exception, (key, opt, [e.value for e in at.exception])
-    for page in ["ภาพรวม", "ภูมิภาค", "กลุ่มแรงงาน", "ที่มาข้อมูล"]:
+    for page in ["ภาพรวม", "ภูมิภาค", "กลุ่มแรงงาน", "สาเหตุการว่างงาน", "ที่มาข้อมูล"]:
         at.session_state["nav_page"] = page
         at.run()
         assert not at.exception, (page, [e.value for e in at.exception])
@@ -58,7 +58,7 @@ def test_every_page_renders_under_each_filter_combination():
         for k, v in combo.items():
             at.session_state[k] = v
         at.run()
-        for page in ["ภาพรวม", "ภูมิภาค", "กลุ่มแรงงาน", "ที่มาข้อมูล"]:
+        for page in ["ภาพรวม", "ภูมิภาค", "กลุ่มแรงงาน", "สาเหตุการว่างงาน", "ที่มาข้อมูล"]:
             at.session_state["nav_page"] = page
             at.run()
             assert not at.exception, (combo, page, [e.value for e in at.exception])

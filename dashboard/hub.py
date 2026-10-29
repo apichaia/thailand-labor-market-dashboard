@@ -1,4 +1,4 @@
-"""The five top-level pages. Each combines the unemployment views with the employment/wage views of the same topic."""
+"""The top-level pages. Each combines the unemployment views with the employment/wage views of the same topic."""
 from __future__ import annotations
 
 import streamlit as st
@@ -10,7 +10,6 @@ from dashboard.pages import Ctx
 POP_TABS = ["การศึกษา", "เพศ", "กลุ่มอายุ", "จำนวนผู้มีงานทำ"]
 REGION_TABS = ["การว่างงานรายภาค", "ค่าจ้างและการมีงานทำรายภาค"]
 ECO_TABS = ["ค่าจ้างและการมีงานทำ", "GDP กับการว่างงาน"]
-EVIDENCE_TABS = ["หลักฐานสาเหตุการว่างงาน", "แหล่งข้อมูลและวิธีการ"]
 
 
 def population(ctx: Ctx) -> None:
@@ -49,9 +48,9 @@ def economy(ctx: Ctx) -> None:
         pages.economic(ctx)
 
 
-def evidence(ctx: Ctx) -> None:
-    sub = st.radio("มุมมอง", EVIDENCE_TABS, horizontal=True, key="nav_evidence", label_visibility="collapsed")
-    if sub == EVIDENCE_TABS[0]:
-        pages.factors(ctx)
-    else:
-        pages.methodology(ctx)
+def causes(ctx: Ctx) -> None:
+    pages.factors(ctx)
+
+
+def sources(ctx: Ctx) -> None:
+    pages.methodology(ctx)

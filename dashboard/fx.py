@@ -16,6 +16,7 @@ export default function(component) {
     fx.sound = !!(data && data.sound);
     document.documentElement.classList.toggle('lm-dark', !!(data && data.dark));
     fx.help = (data && data.help) || {};
+    fx.helpKey = (data && data.help_key) || {};
     const osReduced = () => !!(w.matchMedia && w.matchMedia('(prefers-reduced-motion: reduce)').matches);
     // a viewer whose system asks for reduced motion can switch the animation on with the button in the sidebar (remembered in this browser)
     const motionOn = () => document.documentElement.classList.contains('lm-motion');
@@ -285,6 +286,23 @@ export default function(component) {
             p.pos.style.bottom = nb + 'px';
             tm(720, () => { p.m.classList.remove('jump'); p.pos.style.transition = ''; then(); });
         }
+        // a ghost's way of getting about: it fades out where it stands and fades in at the target
+        function ghostTo(p, tx, nb, then, tm) {
+            tm = tm || later;
+            p.m.classList.remove('walking');
+            p.pos.style.transition = 'opacity 240ms ease, filter 240ms ease';
+            p.pos.style.opacity = '0'; p.pos.style.filter = 'blur(5px)';
+            tm(280, () => {
+                p.pos.style.transition = 'none';
+                p.pos.classList.add('go');
+                p.pos.style.left = tx + 'px'; p.pos.style.bottom = nb + 'px'; x = tx;
+                face(p, FRONT);
+                void p.pos.offsetWidth;
+                p.pos.style.transition = 'opacity 280ms ease, filter 280ms ease';
+                p.pos.style.opacity = '1'; p.pos.style.filter = 'blur(0)';
+                tm(320, () => { p.pos.style.transition = ''; p.pos.style.opacity = ''; p.pos.style.filter = ''; then(); });
+            });
+        }
         function ledge(el) {
             const r = el.getBoundingClientRect(), [lo, hi] = bounds();
             return { tx: Math.min(Math.max(r.right - 84, lo), hi), nb: Math.max(0, innerHeight - 10 - Math.min(r.bottom, innerHeight - 10)) };
@@ -301,7 +319,7 @@ export default function(component) {
             if (r < 0.32) {                                    // walk somewhere else
                 let target = lo + Math.random() * (hi - lo);
                 if (Math.abs(target - x) < 150) target = x < (lo + hi) / 2 ? Math.min(hi, x + 300) : Math.max(lo, x - 300);
-                walkTo(p, target, () => next(500 + Math.random() * 1500));
+                ghostTo(p, target, 0, () => next(500 + Math.random() * 1500));
             } else if (r < 0.44) {                             // visit a card: walk under it, hop up onto its edge, stay a moment, hop down
                 const cards = Array.from(document.querySelectorAll('[class*="st-key-card_"]')).filter((c) => {
                     const q = c.getBoundingClientRect();
@@ -309,10 +327,10 @@ export default function(component) {
                 });
                 if (!cards.length) { next(400); return; }
                 const g = ledge(cards[Math.floor(Math.random() * cards.length)]);
-                walkTo(p, g.tx, () => climb(p, g.nb, () => {
+                ghostTo(p, g.tx, g.nb, () => {
                     p.m.classList.add(['dance', 'look', 'wave'][Math.floor(Math.random() * 3)]);
-                    later(2800, () => { clear(p); climb(p, 0, () => next(900)); });
-                }));
+                    later(2800, () => { clear(p); ghostTo(p, g.tx, 0, () => next(900)); });
+                });
             } else if (r < 0.54) {                             // jump (twice)
                 p.m.classList.add('jump');
                 later(850, () => { p.m.classList.remove('jump'); void p.m.offsetWidth; p.m.classList.add('jump'); });
@@ -339,10 +357,25 @@ export default function(component) {
             }
         }
 
-        // ---- click a chart: the mascot walks up to it, hops onto its edge, points at it and explains how to read it ----
+        // ---- click a chart: the mascot vanishes and reappears on its edge, points at it and explains how to read it ----
+        function chartKey(plot) {                                // the key the app gave this chart (st-key-<key> on its element container)
+            for (let e = plot; e && e !== document.body; e = e.parentElement) {
+                const m = (e.className || '').toString().match(/st-key-([\w-]+)/);
+                if (m && !/^(card_|page_|hero|kpi)/.test(m[1])) return m[1];
+            }
+            return '';
+        }
+        function keyHelp(k) {
+            if (!k) return '';
+            if (fx.helpKey[k]) return fx.helpKey[k];
+            const star = Object.keys(fx.helpKey).find((n) => n.endsWith('*') && k.startsWith(n.slice(0, -1)));
+            return star ? fx.helpKey[star] : '';
+        }
         function explainText(plot) {
             const card = plot.closest('[class*="st-key-card_"]');
             const ttl = card && card.querySelector('.card-title') ? card.querySelector('.card-title').textContent.trim() : '';
+            const kh = keyHelp(chartKey(plot));
+            if (kh) return (ttl ? ttl + ': ' : '') + kh;
             if (ttl && fx.help[ttl]) return ttl + ': ' + fx.help[ttl];
             const gd = plot.querySelector('.js-plotly-plot');
             const lay = gd && gd.layout ? gd.layout : {};
@@ -363,9 +396,7 @@ export default function(component) {
             p.m.classList.remove('explain');
             p.bub.classList.remove('on', 'long', 'below');
             fx.arrived = false; fx.target = null;
-            p.pos.style.transition = 'bottom 700ms cubic-bezier(.4,0,.6,1)';
-            p.pos.style.bottom = '0px';
-            setTimeout(() => { p.pos.style.transition = ''; face(p, FRONT); fx.busy = false; next(1200); }, 760);
+            ghostTo(p, x, 0, () => { fx.busy = false; next(1200); }, (ms, fn) => setTimeout(fn, ms));
         }
         fx.aim = function() {                                  // the page scrolled while the mascot stands on a card: follow it
             const p = parts();
@@ -404,16 +435,14 @@ export default function(component) {
                 place(p, bw, center);
                 fx.explainTimer = setTimeout(endExplain, hold || 11000);
             };
-            // first drop back to the ground if it stands on another card, then walk, then hop up
-            const go = () => walkTo(p, g.tx, () => climb(p, g.nb, arrive, tm), tm);
-            if (parseFloat(p.pos.style.bottom || '0') > 4) climb(p, 0, go, tm); else go();
+            ghostTo(p, g.tx, g.nb, arrive, tm);           // it vanishes and shows up on the card's edge
         };
         document.addEventListener('click', (e) => {
             const tgt = e.target;
             if (!tgt || !tgt.closest || tgt.closest('.mascot-fixed')) return;
             const plot = tgt.closest('[data-testid="stPlotlyChart"]');
             if (plot) { fx.explain(plot); return; }
-            const title = tgt.closest('.card-title');
+            const title = tgt.closest('.card-title') || tgt.closest('.rklist');
             if (title) { const c = title.closest('[class*="st-key-card_"]'); if (c) fx.explain(c); }
         }, true);
         fx.endExplain = endExplain;
@@ -471,10 +500,34 @@ export default function(component) {
 CHART_HELP = {
     "แผนที่ตลาดแรงงานรายภูมิภาค": "แต่ละสีคือหนึ่งภูมิภาค ตัวเลขอยู่ในรายการสีข้างแผนที่ คลิกที่ภาคเพื่อซูมและดูเฉพาะภาคนั้น",
     "แนวโน้มรายไตรมาส": "เส้นแสดงค่าของตัวชี้วัดที่เลือกในแต่ละไตรมาส ช่องว่างในเส้นคือไตรมาสที่ไม่มีค่าที่เชื่อถือได้ ระบบไม่เติมค่าให้",
-    "ภูมิภาคที่มีค่าจ้างสูงสุด": "เทียบค่าจ้างเฉลี่ยต่อเดือนของแต่ละภาคในไตรมาสที่ระบุใต้ชื่อกราฟ ถ้าเลือกภาคในตัวกรอง ภาคอื่นจะจางลง",
     "ค่าจ้างชาย-หญิงตามกลุ่มอายุ": "แท่งทึบคือชาย แท่งลายคือหญิง เทียบค่าจ้างเฉลี่ยต่อเดือนในแต่ละกลุ่มอายุ เป็นข้อมูลระดับประเทศ",
     "ภูมิภาคที่อัตราการว่างงานสูงสุด": "เรียงอัตราการว่างงานของ 5 ภาคจากสูงไปต่ำ แท่งยาวเทียบกับภาคที่สูงที่สุด ภาคที่ไม่มีค่าที่ตรวจสอบแล้วจะไม่ถูกจัดอันดับ",
+    "เหตุผลที่ผู้ว่างงานออกจากงานเดิม": "แต่ละแท่งคือหนึ่งไตรมาส แบ่งสีตามเหตุผลที่ผู้ว่างงานที่เคยทำงานออกจากงานเดิม ความสูงรวมคือผู้ว่างงานที่เคยทำงานทั้งหมดในไตรมาสนั้น ข้อมูลชุดนี้มีถึงปี 2565 เท่านั้น",
     "ความสัมพันธ์ระหว่างค่าจ้างกับการว่างงาน": "แต่ละจุดคือหนึ่งไตรมาส เส้นประคือแนวโน้มเชิงเส้น ค่า r บอกว่าสองค่าเคลื่อนไหวสัมพันธ์กันแค่ไหน ไม่ได้บอกว่าค่าหนึ่งเป็นสาเหตุของอีกค่า",
+}
+
+# Specific sentences for the charts on the other pages, by the key each chart is drawn with ("*" at the end = every key that starts so).
+CHART_HELP_BY_KEY = {
+    "bot_stack": "แต่ละแท่งคือหนึ่งไตรมาส แบ่งสีตามเหตุผลที่ผู้ว่างงานที่เคยทำงานออกจากงานเดิม ความสูงรวมคือผู้ว่างงานที่เคยทำงานทั้งหมด ข้อมูลชุดนี้มีถึงปี 2565 เท่านั้น",
+    "dur_bar": "แต่ละแท่งคือสัดส่วน (ร้อยละ) ของผู้ว่างงานที่หางานมานานตามช่วงเวลานั้น คำนวณจากผลรวมทุกไตรมาสที่เลือก แท่งสูงกว่าคือสัดส่วนมากกว่า",
+    "sso_bar": "แต่ละปีมีแท่งหนึ่งแท่งต่อเหตุผล ความสูงคือจำนวนกรณีที่ใช้สิทธิประกันสังคมกรณีว่างงานในปีนั้น",
+    "eco_two": "สองกราฟซ้อนกันบนแกนไตรมาสเดียวกัน ได้แก่ อัตราการว่างงานและอัตราเติบโตของ GDP แยกแกนเพราะหน่วยต่างกัน",
+    "eco_sc": "แต่ละจุดคือหนึ่งไตรมาส เส้นประคือแนวโน้มเชิงเส้น ใช้ดูว่าสองค่าเคลื่อนไหวไปทางเดียวกันหรือสวนกัน ไม่ได้บอกว่าค่าหนึ่งเป็นสาเหตุของอีกค่า",
+    "ov_scatter": "แต่ละจุดคือหนึ่งไตรมาส เส้นประคือแนวโน้มเชิงเส้น ค่า r บอกว่าสองค่าเคลื่อนไหวสัมพันธ์กันแค่ไหน ไม่ได้บอกว่าค่าหนึ่งเป็นสาเหตุของอีกค่า",
+    "lm_sc": "แต่ละจุดคือหนึ่งไตรมาส ดูว่าจุดเรียงไปทางเดียวกันหรือสวนกัน ไม่ได้บอกว่าค่าหนึ่งเป็นสาเหตุของอีกค่า",
+    "lm_reg_sc": "แต่ละจุดคือข้อมูลหนึ่งรายการตามที่ระบุในแกน ใช้ดูความสัมพันธ์ ไม่ได้บอกสาเหตุ",
+    "lm_pool": "แต่ละจุดคือข้อมูลหนึ่งรายการตามที่ระบุในแกน ใช้ดูความสัมพันธ์ ไม่ได้บอกสาเหตุ",
+    "lm_trend": "แต่ละเส้นคือหนึ่งตัวชี้วัดรายไตรมาส ดูหน่วยจากชื่อแกนและคำอธิบายสี ช่องว่างหรือแถบเทาคือไตรมาสที่ไม่แสดงค่า เพราะไม่มีค่าที่เชื่อถือได้หรือตารางต้นทางขัดแย้งกัน",
+    "lm_regtr_*": "แต่ละเส้นคือหนึ่งภาค ตามไตรมาส ช่องว่างหรือแถบเทาคือไตรมาสที่ไม่แสดงค่า เพราะไม่มีค่าที่เชื่อถือได้หรือตารางต้นทางขัดแย้งกัน",
+    "reg_trend": "แต่ละเส้นคือหนึ่งภาค ตามไตรมาส ช่องว่างหรือแถบเทาคือไตรมาสที่ไม่แสดงค่า เพราะไม่มีค่าที่เชื่อถือได้หรือตารางต้นทางขัดแย้งกัน",
+    "cmp_line_*": "แต่ละสีคือหนึ่งภาคที่เลือกเปรียบเทียบ เส้นขาดคือไตรมาสที่ไม่มีค่าที่เชื่อถือได้ ระบบไม่เติมค่าให้",
+    "reg_bar_u": "แต่ละแท่งคือหนึ่งภาค แท่งยาวกว่าคือมีจำนวนผู้ว่างงานมากกว่าในไตรมาสที่ระบุ",
+    "reg_bar_r": "แต่ละแท่งคือหนึ่งภาค แท่งยาวกว่าคืออัตราการว่างงานสูงกว่าในไตรมาสที่ระบุ",
+    "edu_bar_cnt": "แต่ละแท่งคือหนึ่งระดับการศึกษา แท่งยาวกว่าคือมีผู้ว่างงานมากกว่า สีของแต่ละระดับเหมือนกันทุกกราฟ",
+    "edu_bar_rate": "แต่ละแท่งคือหนึ่งระดับการศึกษา แท่งยาวกว่าคืออัตราการว่างงานสูงกว่า สีของแต่ละระดับเหมือนกันทุกกราฟ",
+    "edu_trend": "แต่ละเส้นคือหนึ่งระดับการศึกษา ตามไตรมาส สีของแต่ละระดับเหมือนกับกราฟแท่งการศึกษา",
+    "sex_bar": "แท่งทึบคือชาย แท่งลายคือหญิง ตามไตรมาส แท่งสูงกว่าคือจำนวนผู้ว่างงานมากกว่า",
+    "lm_hc_age": "แท่งทึบคือชาย แท่งลายคือหญิง ในแต่ละกลุ่มอายุ แท่งสูงกว่าคือมีผู้มีงานทำมากกว่า",
 }
 
 _FX = st.components.v2.component("lm_fx", js=_JS)
@@ -482,4 +535,4 @@ _FX = st.components.v2.component("lm_fx", js=_JS)
 
 def mount(sound: bool, dark: bool = False) -> None:
     """Call once per run (it draws nothing)."""
-    _FX(data={"sound": bool(sound), "dark": bool(dark), "help": CHART_HELP}, key="lm_fx")
+    _FX(data={"sound": bool(sound), "dark": bool(dark), "help": CHART_HELP, "help_key": CHART_HELP_BY_KEY}, key="lm_fx")

@@ -14,7 +14,7 @@ import streamlit as st
 import config
 from analytics import metrics
 from analytics import selectors as sel_
-from dashboard import charts, labour_page
+from dashboard import charts, kpi_agg, labour_page
 from dashboard import components as ui
 from dashboard import pages
 from dashboard.pages import Ctx, _card_title, _ckey, _plabel, _plot, _src_url
@@ -140,37 +140,117 @@ def _delta_text(df: pd.DataFrame, col: str, row, kind: str, dec: int) -> str:
 _scoped_series = sel_.lm_scoped_series
 
 
+def _u_scope(f) -> str:
+    """The group the unemployment card describes, named from the filters it really uses (all three filters apply to this card)."""
+    parts = [", ".join(f.regions)] if f.regions else []
+    if f.sexes:
+        parts.append("เพศ" + ", ".join(f.sexes))
+    if f.edu_active:
+        parts.append("การศึกษา " + ", ".join(f.edus))
+    return " · ".join(parts) or "ทั่วประเทศ"
+
+
+def _unused(qs: list[int], used: list[int]) -> str:
+    miss = [q for q in qs if q not in set(used)]
+    return "" if not miss else " · ไม่ได้ใช้: " + ", ".join(_plabel(q) for q in miss[:6]) + (" …" if len(miss) > 6 else "")
+
+
 def _kpi_row(ctx: Ctx, idx: int, sel) -> None:
+    """The four cards follow the sidebar's years and quarters: several quarters -> a weighted summary (see kpi_agg), one quarter -> that quarter."""
     b, f = ctx.bundle, ctx.filters
     emp, wage, hcm, scope, notes = _scoped_series(b, f)
+    d = sel.data
+    latest = max([int(x["period_idx"].max()) for x in (d, hcm) if x is not None and len(x)] + [idx])
+    qs = kpi_agg.selected_quarters(f, latest)
+    if len(qs) > 1:
+        _kpi_row_multi(ctx, qs, sel, emp, wage, hcm, scope, notes)
+        return
+    exact = len(qs) == 1            # one quarter picked: show that quarter's own value (no falling back to an older one)
+    if exact:
+        idx = qs[0]
     c1, c2, c3, c4 = st.container(key="kpi_row").columns([1.2, 1, 1, 1], gap="small")   # 2 x 2 on phones (theme.CSS_BENTO)
+
+    def pick(df, col):
+        r, vals = _series_upto(df, col, idx)
+        if exact and r is not None and int(r["period_idx"]) != idx:
+            return None, []
+        return r, vals
 
     def line(row) -> str:
         p = int(row["period_idx"])
         return f"{_plabel(p)} · "
 
     # 1 employment rate
-    r, vals = _series_upto(emp, "emp_pct", idx)
+    r, vals = pick(emp, "emp_pct")
     c1.markdown(_card("g1", ICON_EMP, "อัตราการมีงานทำ", None if r is None else f"{r['emp_pct']:.2f}", "%" if r is not None else "",
                       "" if r is None else _delta_text(emp, "emp_pct", r, "pt", 2), _spark(vals),
-                      "" if r is None else line(r) + scope, "ไม่มีค่าที่เชื่อถือได้ในกลุ่มนี้", "สสช. OS_02_0016_03 · " + scope), unsafe_allow_html=True)
+                      "" if r is None else line(r) + scope, "ไม่มีค่าที่เชื่อถือได้ในไตรมาสนี้", "สสช. OS_02_0016_03 · " + scope), unsafe_allow_html=True)
     # 2 unemployment rate: always follows every sidebar filter
-    d = sel.data
-    r, vals = _series_upto(d, "rate_pct", idx)
-    u_scope = "ทั่วประเทศ" if not (f.regions or f.sexes or f.edu_active) else "ตามตัวกรอง"
+    r, vals = pick(d, "rate_pct")
+    u_scope = _u_scope(f)
     c2.markdown(_card("g2", ICON_JOB, "อัตราการว่างงาน", None if r is None else f"{r['rate_pct']:.2f}", "%" if r is not None else "",
                       "" if r is None else _delta_text(d, "rate_pct", r, "pt", 2), _spark(vals),
                       "" if r is None else line(r) + u_scope, "ไม่มีตัวหารกำลังแรงงานภายใต้ตัวกรองนี้", "สสช. · ผู้ว่างงาน ÷ กำลังแรงงาน"), unsafe_allow_html=True)
     # 3 wage
-    r, vals = _series_upto(wage, "wage", idx)
+    r, vals = pick(wage, "wage")
     c3.markdown(_card("g3", ICON_WAGE, "ค่าจ้างเฉลี่ยต่อเดือน", None if r is None else f"{r['wage']:,.0f}", "บาท" if r is not None else "",
                       "" if r is None else _delta_text(wage, "wage", r, "pct", 1), _spark(vals),
-                      "" if r is None else line(r) + scope, "ไม่มีค่าที่เชื่อถือได้ในกลุ่มนี้", "สสช. OS_02_0024_01 · ราคาปัจจุบัน · " + scope), unsafe_allow_html=True)
-    # 4 employed persons (file received from a friend, checked against NSO)
-    r, vals = _series_upto(hcm, "emp_m", idx)
+                      "" if r is None else line(r) + scope, "ไม่มีค่าที่เชื่อถือได้ในไตรมาสนี้", "สสช. OS_02_0024_01 · ราคาปัจจุบัน · " + scope), unsafe_allow_html=True)
+    # 4 employed persons
+    r, vals = pick(hcm, "emp_m")
     c4.markdown(_card("g4", ICON_CROWD, "จำนวนผู้มีงานทำ", None if r is None else f"{r['emp_m']:.2f}", "ล้านคน" if r is not None else "",
                       "" if r is None else _delta_text(hcm, "emp_m", r, "pct", 1), _spark(vals),
-                      "" if r is None else line(r) + hcm.attrs.get("scope", scope), "ไม่มีข้อมูลในกลุ่มนี้", "สสช. OS_02_0002_01 ตรวจกับ LFS_02_20535_1 · " + hcm.attrs.get("scope", scope)), unsafe_allow_html=True)
+                      "" if r is None else line(r) + hcm.attrs.get("scope", scope), "ไม่มีข้อมูลในไตรมาสนี้", "สสช. OS_02_0002_01 ตรวจกับ LFS_02_20535_1 · " + hcm.attrs.get("scope", scope)), unsafe_allow_html=True)
+    for n in notes:
+        st.caption(":material/info: " + n)
+
+
+def _kpi_row_multi(ctx: Ctx, qs: list[int], sel, emp, wage, hcm, scope: str, notes: list[str]) -> None:
+    """Several quarters selected: one summary per card, with the method written on the card and every unused quarter named in its tooltip."""
+    f = ctx.filters
+    c1, c2, c3, c4 = st.container(key="kpi_row").columns([1.2, 1, 1, 1], gap="small")
+
+    def sp(dct):                                    # the quarters of the selection; gaps stay gaps
+        return _spark([dct.get(q, np.nan) for q in qs[-12:]])
+
+    hc_scope = hcm.attrs.get("scope", scope) if hcm is not None else scope
+
+    # 1 employment rate: weighted by the working-age population (employed / published rate), same scope for both
+    emp_m, rate = kpi_agg.to_dict(hcm, "emp_m"), kpi_agg.to_dict(emp, "emp_pct")
+    if scope == hc_scope:
+        a = kpi_agg.employment_rate(emp_m, rate, qs)
+    else:
+        a = kpi_agg.Agg(None, [], "ข้อมูลไม่เพียงพอสำหรับคำนวณค่าเฉลี่ยช่วงนี้ (ตัวกรองนี้ไม่มีอัตราของ สสช. ที่ตรงกับขอบเขตจำนวนผู้มีงานทำ)")
+    c1.markdown(_card("g1", ICON_EMP, "อัตราการมีงานทำเฉลี่ยในช่วงที่เลือก", None if a.value is None else f"{a.value:.2f}", "%" if a.value is not None else "",
+                      "ถ่วงน้ำหนักด้วยประชากรวัยแรงงาน", sp(rate), f"{hc_scope} · " + kpi_agg.span_text(qs, a.used, f), a.reason or "",
+                      "ผลรวมผู้มีงานทำ ÷ ผลรวมประชากรวัยแรงงานของไตรมาสเดียวกัน × 100 (ประชากรวัยแรงงาน = ผู้มีงานทำ ÷ อัตราที่ สสช. เผยแพร่) "
+                      "ไม่เฉลี่ยเปอร์เซ็นต์โดยตรง" + _unused(qs, a.used)), unsafe_allow_html=True)
+
+    # 2 unemployment rate: weighted by the labour force; the quarters whose rate failed a check are left out
+    d = sel.data
+    u, lf, ok = kpi_agg.to_dict(d, "u_k"), kpi_agg.to_dict(d, "lf_k"), kpi_agg.to_dict(d, "rate_pct")
+    a2 = kpi_agg.unemployment_rate(u, lf, ok, qs)
+    u_scope = _u_scope(f)
+    why2 = "ไม่มีตัวหารกำลังแรงงานภายใต้ตัวกรองนี้" if not lf else (a2.reason or "")
+    c2.markdown(_card("g2", ICON_JOB, "อัตราการว่างงานเฉลี่ยในช่วงที่เลือก", None if a2.value is None else f"{a2.value:.2f}", "%" if a2.value is not None else "",
+                      "ถ่วงน้ำหนักด้วยกำลังแรงงาน", sp(ok), f"{u_scope} · " + kpi_agg.span_text(qs, a2.used, f), why2,
+                      "ผลรวมผู้ว่างงาน ÷ ผลรวมกำลังแรงงานของไตรมาสเดียวกัน × 100 เฉพาะไตรมาสที่อัตราผ่านการตรวจ (ตัวหาร 2 ตารางของ สสช. ต้องตรงกัน) "
+                      "ไม่เฉลี่ยเปอร์เซ็นต์โดยตรง" + _unused(qs, a2.used)), unsafe_allow_html=True)
+
+    # 3 wage: no employee counts exist to weight with -> a plain mean of the quarterly values, said on the card
+    wv = kpi_agg.to_dict(wage, "wage")
+    a3 = kpi_agg.simple_mean(wv, qs)
+    c3.markdown(_card("g3", ICON_WAGE, "ค่าจ้างเฉลี่ยต่อเดือนในช่วงที่เลือก", None if a3.value is None else f"{a3.value:,.0f}", "บาท" if a3.value is not None else "",
+                      "ค่าเฉลี่ยของค่าจ้างรายไตรมาส ไม่ถ่วงน้ำหนัก", sp(wv), f"{scope} · " + kpi_agg.span_text(qs, a3.used, f), a3.reason or "",
+                      "เฉลี่ยค่าจ้างรายไตรมาสแบบธรรมดา เพราะไม่มีจำนวนลูกจ้างที่ตรงกับฐานข้อมูลค่าจ้างไว้ถ่วงน้ำหนัก (ไม่ใช้จำนวนผู้มีงานทำแทน) "
+                      "ไตรมาสที่ค่าจ้างไม่ผ่านการตรวจถูกเว้น · ราคาปัจจุบัน" + _unused(qs, a3.used)), unsafe_allow_html=True)
+
+    # 4 employed persons: the mean of the quarterly totals (one value per quarter), never a running sum
+    a4 = kpi_agg.simple_mean(emp_m, qs)
+    c4.markdown(_card("g4", ICON_CROWD, "จำนวนผู้มีงานทำเฉลี่ยต่อไตรมาส", None if a4.value is None else f"{a4.value:.2f}", "ล้านคน" if a4.value is not None else "",
+                      "เฉลี่ยต่อไตรมาส (ไม่ใช่ผลรวมสะสม)", sp(emp_m), f"{hc_scope} · " + kpi_agg.span_text(qs, a4.used, f), a4.reason or "",
+                      "ผลรวมจำนวนผู้มีงานทำของแต่ละไตรมาส ÷ จำนวนไตรมาสที่มีข้อมูล (หนึ่งค่าต่อไตรมาส) ไม่นำมาบวกสะสม เพราะไม่ใช่จำนวนคนไม่ซ้ำ"
+                      + _unused(qs, a4.used)), unsafe_allow_html=True)
     for n in notes:
         st.caption(":material/info: " + n)
 
@@ -270,7 +350,7 @@ def _map_and_trend(ctx: Ctx, idx: int, sel) -> None:
                 tchoice = st.selectbox("ตัวชี้วัดแนวโน้ม", ["อัตรามีงานทำ", "อัตราการว่างงาน", "ค่าจ้างเฉลี่ย", "จำนวนผู้ว่างงาน"], key="ov_trend_choice",
                                        label_visibility="collapsed")
             emp_s, wage_s, _hc, t_scope, _n = _scoped_series(b, f)
-            tf = f.for_trend()   # the whole 2563+ scope; the picked years are shaded
+            tf = f   # only the picked years and quarters
             lmn_e, lmn_w = sel_.in_time(emp_s, tf), sel_.in_time(wage_s, tf)
             full = metrics.add_changes(sel.data, "u_k")
             win = sel_.in_time(full, tf)
@@ -296,33 +376,18 @@ def _map_and_trend(ctx: Ctx, idx: int, sel) -> None:
 
 
 def _wage_cards(ctx: Ctx, idx: int) -> None:
-    b = ctx.bundle
-    rs = b.get("region_series")
-    sa = b.get("lm_sex_age")
-    c1, c2 = st.columns([1, 1.15], gap="small")
-    with c1:
-        with st.container(border=True, key=_ckey()):
-            p = _latest_region_period(rs, "wage", idx)
-            _card_title("ภูมิภาคที่มีค่าจ้างสูงสุด", f"จัดอันดับ 5 ภาค · บาทต่อเดือน · {_plabel(p)}" if p else "")
-            if p is None:
-                ui.empty_state("ไม่มีค่าจ้างรายภาคที่ผ่านการตรวจสอบ")
-            else:
-                d = rs[rs["period_idx"] == p].dropna(subset=["wage"])
-                st.markdown(region_rank_html(d, "wage", "", 0, list(ctx.filters.regions)), unsafe_allow_html=True)
-                if ctx.filters.regions:
-                    st.caption("แท่งเข้ม = ภาคที่เลือกในตัวกรอง · ภาคอื่นจางลงเพื่อให้เทียบกันได้")
-    with c2:
-        with st.container(border=True, key=_ckey()):
-            p = _sexage_period(sa, idx)
-            if p is None:
-                _card_title("ค่าจ้างชาย-หญิงตามกลุ่มอายุ")
-                ui.empty_state("ไม่มีค่าจ้างเพศ×อายุที่ผ่านการตรวจสอบ")
-            else:
-                cur = sa[sa["sex"].isin(["ชาย", "หญิง"]) & (sa["age_group"] != "รวม") & (sa["period_idx"] == p)].dropna(subset=["wage"])
-                ages = [a for a in ["15-19 ปี", "20-24 ปี", "25-29 ปี", "30-34 ปี", "35-39 ปี", "40-49 ปี", "50-59 ปี", "60 ปีขึ้นไป"] if a in set(cur["age_group"])]
-                cur = cur.assign(age_group=pd.Categorical(cur["age_group"], ages, ordered=True)).sort_values("age_group")
-                _card_title("ค่าจ้างชาย-หญิงตามกลุ่มอายุ", f"บาทต่อเดือน · {_plabel(p)}")
-                _plot_inline(charts.grouped_bar(cur, "age_group", "wage", "sex", "ค่าจ้างเฉลี่ย", "บาท/เดือน", 0), "ov_sexage", 340)
+    sa = ctx.bundle.get("lm_sex_age")
+    with st.container(border=True, key=_ckey()):
+        p = _sexage_period(sa, idx)
+        if p is None:
+            _card_title("ค่าจ้างชาย-หญิงตามกลุ่มอายุ")
+            ui.empty_state("ไม่มีค่าจ้างเพศ×อายุที่ผ่านการตรวจสอบ")
+        else:
+            cur = sa[sa["sex"].isin(["ชาย", "หญิง"]) & (sa["age_group"] != "รวม") & (sa["period_idx"] == p)].dropna(subset=["wage"])
+            ages = [a for a in ["15-19 ปี", "20-24 ปี", "25-29 ปี", "30-34 ปี", "35-39 ปี", "40-49 ปี", "50-59 ปี", "60 ปีขึ้นไป"] if a in set(cur["age_group"])]
+            cur = cur.assign(age_group=pd.Categorical(cur["age_group"], ages, ordered=True)).sort_values("age_group")
+            _card_title("ค่าจ้างชาย-หญิงตามกลุ่มอายุ", f"บาทต่อเดือน · {_plabel(p)}")
+            _plot_inline(charts.grouped_bar(cur, "age_group", "wage", "sex", "ค่าจ้างเฉลี่ย", "บาท/เดือน", 0), "ov_sexage", 340)
 
 
 def _plot_inline(fig, key: str, height: int | None = None) -> None:
@@ -338,35 +403,6 @@ def corr_phrase(r: float) -> str:
         return "แทบไม่สัมพันธ์กัน"
     strength = "ระดับอ่อน" if a < 0.3 else ("ระดับปานกลาง" if a < 0.5 else "ระดับสูง")
     return f"สัมพันธ์{'เชิงลบ' if r < 0 else 'เชิงบวก'}{strength}"
-
-
-def _insights(ctx: Ctx, idx: int, r: float | None) -> list[tuple[str, str]]:
-    """Up to four sentences made only of numbers that are on this page."""
-    b = ctx.bundle
-    rs = b.get("region_series")
-    out = []
-    pe = _latest_region_period(rs, "emp_pct", idx)
-    if pe is not None:
-        d = rs[rs["period_idx"] == pe].dropna(subset=["emp_pct"])
-        top = d.loc[d["emp_pct"].idxmax()]
-        low = d.loc[d["emp_pct"].idxmin()]
-        out.append((f"{top['region']}มีอัตรามีงานทำสูงสุด {top['emp_pct']:.1f}%", f"{_plabel(pe)} · ต่ำสุดคือ{low['region']} {low['emp_pct']:.1f}%"))
-    pw = _latest_region_period(rs, "wage", idx)
-    if pw is not None:
-        d = rs[rs["period_idx"] == pw].dropna(subset=["wage"])
-        top = d.loc[d["wage"].idxmax()]
-        low = d.loc[d["wage"].idxmin()]
-        out.append((f"{top['region']}มีค่าจ้างเฉลี่ยสูงสุด ฿{top['wage']:,.0f}",
-                    f"{_plabel(pw)} · สูงกว่า{low['region']} (฿{low['wage']:,.0f}) {(top['wage'] / low['wage'] - 1) * 100:.0f}%"))
-    pu = _latest_region_period(rs, "rate_pct", idx)
-    if pu is not None:
-        d = rs[rs["period_idx"] == pu].dropna(subset=["rate_pct"])
-        top = d.loc[d["rate_pct"].idxmax()]
-        low = d.loc[d["rate_pct"].idxmin()]
-        out.append((f"{top['region']}มีอัตราการว่างงานสูงสุด {top['rate_pct']:.2f}%", f"{_plabel(pu)} · ต่ำสุดคือ{low['region']} {low['rate_pct']:.2f}%"))
-    if r is not None:
-        out.append((f"ค่าจ้างกับอัตราการว่างงาน{corr_phrase(r)} (r = {r:.2f})", "เป็นความสัมพันธ์เชิงสถิติ ไม่ใช่เหตุและผล"))
-    return out
 
 
 def region_rank_html(d: pd.DataFrame, col: str, unit: str, dec: int, highlight=()) -> str:
@@ -386,7 +422,7 @@ def region_rank_html(d: pd.DataFrame, col: str, unit: str, dec: int, highlight=(
 
 def _province_scatter_insights(ctx: Ctx, idx: int) -> None:
     b = ctx.bundle
-    p1, p2, p3 = st.columns([1.05, 1.15, 1], gap="small")
+    p1, p2 = st.columns([1, 1.45], gap="small")
     with p1:
         with st.container(border=True, key=_ckey()):
             rs = b.get("region_series")
@@ -399,7 +435,6 @@ def _province_scatter_insights(ctx: Ctx, idx: int) -> None:
                 d = rs[rs["period_idx"] == p].dropna(subset=["rate_pct"])
                 st.markdown(region_rank_html(d, "rate_pct", "%", 2, list(ctx.filters.regions)), unsafe_allow_html=True)
                 st.caption("แท่งเข้ม = ภาคที่เลือกในตัวกรอง" if ctx.filters.regions else "อัตราการว่างงาน = ผู้ว่างงาน ÷ กำลังแรงงาน · ภาคที่ไม่มีค่าที่ตรวจสอบแล้วไม่ถูกจัดอันดับ")
-    r_val = None
     with p2:
         with st.container(border=True, key=_ckey()):
             _card_title("ความสัมพันธ์ระหว่างค่าจ้างกับการว่างงาน", "แต่ละจุดคือหนึ่งไตรมาส")
@@ -409,18 +444,35 @@ def _province_scatter_insights(ctx: Ctx, idx: int) -> None:
             if cs.get("reason"):
                 ui.empty_state(cs["reason"])
             else:
-                r_val = cs["pearson"]
                 _plot_inline(labour_page._scatter_figure(d, "wage", "ค่าจ้างเฉลี่ย", "บาท/เดือน"), "ov_scatter", 390)
-                st.caption(f"r = {cs['pearson']:.2f} · n = {cs['n']} ไตรมาส · ไม่ใช่ความเป็นเหตุเป็นผล")
-    with p3:
-        with st.container(border=True, key=_ckey()):
-            _card_title("สรุปจากข้อมูล", "สร้างจากตัวเลขในหน้านี้โดยอัตโนมัติ")
-            items = _insights(ctx, idx, r_val)
-            if not items:
-                st.write("ยังไม่มีข้อมูลเพียงพอสำหรับสรุป")
-            for n, (head, sub) in enumerate(items, 1):
-                st.markdown(f'<div class="ins"><div class="n">{n}</div><div><b>{ui.esc(head)}</b><div class="s">{ui.esc(sub)}</div></div></div>',
-                            unsafe_allow_html=True)
+                st.caption(f"ค่าจ้างกับอัตราการว่างงาน{corr_phrase(cs['pearson'])} (r = {cs['pearson']:.2f} · n = {cs['n']} ไตรมาส) · เป็นความสัมพันธ์เชิงสถิติ ไม่ใช่เหตุและผล")
+
+
+def _reasons_card(ctx: Ctx) -> None:
+    """Why the unemployed who had worked left their last job (BOT EC_RL_019). The table ends in 2565, so the card says so and never draws later quarters."""
+    b, f = ctx.bundle, ctx.filters
+    bot = b.get("bot_reasons")
+    with st.container(border=True, key=_ckey()):
+        if bot is None or bot.empty:
+            _card_title("เหตุผลที่ผู้ว่างงานออกจากงานเดิม")
+            ui.empty_state("ไม่สามารถอ่านข้อมูลเหตุผลที่ออกจากงานจาก ธปท. ได้ในขณะนี้")
+            return
+        cats = bot[bot["category"] != "ผู้ว่างงานที่เคยทำงาน"]
+        _card_title("เหตุผลที่ผู้ว่างงานออกจากงานเดิม", f"ผู้ว่างงานที่เคยทำงาน · คน · ข้อมูลมี {ui.period_range_text(cats)} เท่านั้น")
+        win = sel_.in_time(cats, f)
+        if win.empty:
+            ui.empty_state(f"ช่วงที่เลือกไม่มีข้อมูลเหตุผลที่ออกจากงาน (ข้อมูลครอบคลุม {ui.period_range_text(cats)}) เลือก \"ทุกปี\" หรือปีในช่วงนี้เพื่อดู")
+            return
+        fig = charts.stacked_reasons(win)
+        fig.update_xaxes(tickvals=[charts._label(int(i)) for i in sorted(win["period_idx"].unique())],
+                         ticktext=[f"{int(i) % 4 + 1}/{str(int(i) // 4)[-2:]}" for i in sorted(win["period_idx"].unique())], title_text="ไตรมาส/ปี พ.ศ.")
+        # a wide card: the legend goes to the right as one column so the bars keep the full height
+        fig.update_layout(margin=dict(l=8, r=8, t=12, b=56),
+                          legend=dict(orientation="v", xref="paper", x=1.01, xanchor="left", yref="paper", y=0.5, yanchor="middle", font=dict(size=13), tracegroupgap=2))
+        fig.update_yaxes(title_text="คน", rangemode="tozero")
+        _plot_inline(fig, "ov_reasons", 430)
+        st.caption("ธปท. EC_RL_019 (ที่มา: สสช. สำรวจภาวะการทำงานของประชากร) · เฉพาะผู้ที่เคยทำงาน ไม่รวมผู้เข้าสู่ตลาดแรงงานครั้งแรก · "
+                   "บอกเหตุผลที่ออกจากงานเดิมตามที่ผู้ตอบรายงาน ไม่ได้อธิบายว่าเหตุใดเศรษฐกิจโดยรวมจึงมีคนว่างงาน")
 
 
 # ---------------------------------------------------------------------------
@@ -531,6 +583,7 @@ def home(ctx: Ctx) -> None:
     _period_strip(ctx, idx)
     _map_and_trend(ctx, idx, sel)
     _province_scatter_insights(ctx, idx)
+    _reasons_card(ctx)
     # extra sections are built only when asked for: they are heavy, and a folded section used to be computed on every click anyway
     more = st.segmented_control("รายละเอียดเพิ่มเติม", ["เปรียบเทียบ", "แนวโน้ม 3 ตัวชี้วัดและความสัมพันธ์", "เทียบกับเศรษฐกิจ (GDP)"], key="ov_more",
                                 help="เลือกเพื่อเปิดส่วนที่ละเอียดกว่า กดซ้ำเพื่อปิด (ส่วนนี้ไม่ถูกคำนวณจนกว่าจะเปิด เพื่อให้หน้าตอบสนองเร็ว)")

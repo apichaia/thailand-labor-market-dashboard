@@ -157,7 +157,7 @@ def _setup(ctx: Ctx, trend: bool = False):
         ui.empty_state("ยังไม่มีข้อมูลอัตรามีงานทำ/ค่าจ้างที่ผ่านการตรวจสอบ — กดรีเฟรชข้อมูล หรือดูสถานะในหน้า ที่มาและหลักฐาน")
         return None
     all_idx = pd.concat([b.get("lm_national")["period_idx"], b.get("national")["period_idx"]])
-    lo = max(int(all_idx.min()), (f.for_trend() if trend else f).year_min * 4) if f.year_min else int(all_idx.min())
+    lo = max(int(all_idx.min()), f.year_min * 4) if f.year_min else int(all_idx.min())
     hi = min(int(all_idx.max()), f.year_max * 4 + 3) if f.year_max else int(all_idx.max())
     if lo > hi:
         ui.empty_state("ไม่มีข้อมูลในปีที่เลือก ลองเลือกปีอื่นหรือ ทุกปี")

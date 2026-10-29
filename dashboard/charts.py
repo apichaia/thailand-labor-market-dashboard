@@ -81,17 +81,6 @@ def _category_x(fig, lo, hi, row=None, col=None):
         fig.update_xaxes(**kw)
 
 
-def shade_focus(fig: go.Figure, lo: int, hi: int, focus: tuple[int, int] | None) -> None:
-    """Shade the picked years on a category time axis that runs from quarter lo to hi (nothing when they cover it all)."""
-    if not focus:
-        return
-    a, b = max(focus[0], lo), min(focus[1], hi)
-    if a > b or (a == lo and b == hi):
-        return
-    fig.add_vrect(x0=a - lo - 0.5, x1=b - lo + 0.5, fillcolor=rgba(theme.PRIMARY, 0.08), line_width=0, layer="below",
-                  annotation_text="ช่วงที่เลือก", annotation_position="top left", annotation_font=dict(size=11, color=theme.MUTED))
-
-
 def shade_excluded(fig: go.Figure, lo: int, hi: int, idxs, label: str = "ไม่แสดงค่า") -> None:
     """Grey bands over the quarters whose values were left out because the source tables disagree (runs of neighbouring quarters are one band)."""
     runs: list[list[int]] = []
@@ -168,14 +157,18 @@ def trend_line(df: pd.DataFrame, y: str, ytitle: str, hover_unit: str, *, flag_c
                                      hovertemplate="<b>%{x}</b><br>เทียบปีก่อน ผิดปกติเชิงสถิติ<extra></extra>"))
     style(fig, ytitle=f"{ytitle} ({hover_unit})", height=height)
     _category_x(fig, int(d["period_idx"].min()), int(d["period_idx"].max()))
-    shade_focus(fig, int(d["period_idx"].min()), int(d["period_idx"].max()), focus)
     return fig
+
+
+# one colour per education level (the same level has the same colour in every chart), taken from the region palette so the page reads as one set
+EDU_COLORS = ["#FF6FB5", "#AB46D2", "#55D8C1", "#92D9F7", "#FCF69C", "#C9B8D6"]
 
 
 def hbar_education(df: pd.DataFrame, value: str, order: list[str], xtitle: str, unit: str, decimals=1, height: int | None = None) -> go.Figure:
     d = df.set_index("edu_group").reindex(order).dropna(subset=[value]).reset_index()
     fig = go.Figure(go.Bar(
-        y=[_wrap(x) for x in d["edu_group"]], x=d[value], orientation="h", marker_color=theme.PRIMARY, customdata=d["edu_group"],
+        y=[_wrap(x) for x in d["edu_group"]], x=d[value], orientation="h",
+        marker_color=[EDU_COLORS[order.index(x) % len(EDU_COLORS)] if x in order else theme.PRIMARY for x in d["edu_group"]], customdata=d["edu_group"],
         text=[f"{v:,.{decimals}f}" for v in d[value]], textposition="outside", cliponaxis=False,
         hovertemplate="<b>%{customdata}</b><br>" + xtitle + ": %{x:,." + str(decimals) + "f} " + unit + "<extra></extra>"))
     style(fig, height=height or max(300, 70 * len(d) + 80), legend_bottom=False)
@@ -215,7 +208,6 @@ def multi_line(df: pd.DataFrame, y: str, group: str, ytitle: str, unit: str, dec
             hovertemplate="<b>%{x}</b><br>" + str(g) + ": %{y:,." + str(decimals) + "f} " + unit + "<extra></extra>"))
     style(fig, ytitle=f"{ytitle} ({unit})", height=height)
     _category_x(fig, int(d["period_idx"].min()), int(d["period_idx"].max()))
-    shade_focus(fig, int(d["period_idx"].min()), int(d["period_idx"].max()), focus)
     if excluded:
         shade_excluded(fig, int(d["period_idx"].min()), int(d["period_idx"].max()), excluded)
     return fig

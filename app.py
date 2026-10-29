@@ -13,7 +13,7 @@ import streamlit as st
 
 import config
 from analytics import selectors as sel_
-from dashboard import fx, mascot
+from dashboard import fx, intro, mascot
 from dashboard import components as ui
 from dashboard import hub, overview, pages, theme
 from dashboard.report import build_summary_markdown
@@ -48,6 +48,9 @@ def _setup_logging() -> None:
 
 _setup_logging()
 st.markdown(theme.CSS + theme.CSS_V2 + theme.CSS_FX + theme.CSS_BENTO + theme.CSS_3D + theme.CSS_DARK, unsafe_allow_html=True)
+from data_processing import intro_payload   # noqa: E402
+
+intro.mount(intro_payload.read())   # the film before the dashboard (skipped when there is no data yet or no internet)
 fx.mount(st.session_state.get("snd_on", False), st.session_state.get("dark_on", False))   # outside the sidebar: it must also run while the sidebar is collapsed
 if st.session_state.get("mascot_on", True):
     st.markdown('<div class="mascot-fixed"><div class="mf-pos"><div class="mf-bubble"></div><div class="mf-pop"><div class="mf-flip">' + mascot.happy3d() + '</div></div></div></div>', unsafe_allow_html=True)   # pops up when the viewer scrolls down to the charts (CSS only)
@@ -146,7 +149,7 @@ def overall_status():
 
 kind, status_text, fetched_when = overall_status()
 
-PAGES = ["ภาพรวม", "ภูมิภาค", "กลุ่มแรงงาน", "ที่มาข้อมูล"]
+PAGES = ["ภาพรวม", "ภูมิภาค", "กลุ่มแรงงาน", "สาเหตุการว่างงาน", "ที่มาข้อมูล"]
 
 # ---------------------------------------------------------------------------
 # filter state (kept in session_state; defaults are filled once the data is known)
@@ -156,7 +159,7 @@ nat = bundle.get("national") if bundle.usable else None
 years = sorted(nat["year_be"].unique().tolist()) if nat is not None and len(nat) else []
 regions = sel_.all_regions(bundle) if bundle.usable else []
 ALL_YEARS = "ทุกปี"
-DEFAULTS = {"f_year": years[-1] if years else None, "f_quarters": [1, 2, 3, 4],
+DEFAULTS = {"f_year": ALL_YEARS if years else None, "f_quarters": [1, 2, 3, 4],
             "f_regions": [], "f_sex": "ทั้งหมด", "f_edus": []}
 for k, v_ in DEFAULTS.items():
     if v_ is not None:
@@ -195,7 +198,7 @@ with st.sidebar:
     st.markdown('<div class="side-title">ตัวกรองข้อมูล</div>', unsafe_allow_html=True)
     if bundle.usable:
         with st.container(key="flt_year"):
-            st.selectbox("ปี (พ.ศ.)", [ALL_YEARS] + years[::-1], key="f_year", help="เลือกทีละปี การ์ดด้านบนแสดงไตรมาสล่าสุดของปีที่เลือก")
+            st.selectbox("ปี (พ.ศ.)", [ALL_YEARS] + years[::-1], key="f_year", help="ค่าเริ่มต้นคือทุกปี หรือเลือกทีละปี การ์ดด้านบนสรุปตามช่วงที่เลือก")
         with st.container(key="flt_quarter"):
             st.pills("ไตรมาส", [1, 2, 3, 4], selection_mode="multi", key="f_quarters", format_func=lambda q: f"Q{q}")
         with st.container(key="flt_region"):
@@ -224,6 +227,7 @@ with st.sidebar:
         st.download_button("รายงาน", build_summary_markdown(ctx).encode("utf-8"), file_name="labour_market_summary.md", mime="text/markdown",
                            icon=":material/download:", width="stretch", help="ดาวน์โหลดรายงานสรุป (.md) ตามตัวกรองปัจจุบัน")
     with st.expander("ตั้งค่า", icon=":material/settings:"):
+        st.button("เล่นอินโทรอีกครั้ง", icon=":material/play_circle:", width="stretch", on_click=intro.replay, help="ดูหน้าอินโทรก่อนเข้าแดชบอร์ดอีกครั้ง")
         st.toggle("โหมดมืด", key="dark_on", value=False, help="เปลี่ยนเป็นธีมสีเข้ม ถนอมสายตาเวลาใช้งานตอนกลางคืน")
         st.toggle("เสียงเอฟเฟกต์", key="snd_on", value=False, help="เสียงคลิกเบา ๆ เมื่อกดแท็บ ปุ่ม และภาคบนแผนที่ (ปิดไว้ตามค่าเริ่มต้น)")
         st.toggle("มาสคอตเดินบนหน้าจอ", key="mascot_on", value=True, help="ปิดเพื่อไม่ให้ตัวการ์ตูนบังกราฟ (บนมือถือซ่อนไว้เสมอ)")
@@ -235,7 +239,7 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 
 with st.container(key="hero"):
-    st.markdown('<h1 class="hero-t">ศูนย์วิเคราะห์ตลาดแรงงานไทย</h1>'
+    st.markdown('<h1 class="hero-t">ตลาดแรงงานไทย (Thailand labor market)</h1>'
                 '<div class="hero-s">วิเคราะห์การจ้างงาน การว่างงาน ค่าจ้าง และสภาวะตลาดแรงงานของไทย ในมิติเวลา ภูมิภาค และกลุ่มประชากร</div>',
                 unsafe_allow_html=True)
 page = st.radio("เลือกหน้า", PAGES, horizontal=True, key="nav_page", label_visibility="collapsed")   # the tabs sit under the banner
@@ -272,5 +276,7 @@ with st.container(key=f"page_{PAGES.index(page)}"):
         hub.regional(ctx)
     elif page == PAGES[2]:
         hub.population(ctx)
+    elif page == PAGES[3]:
+        hub.causes(ctx)
     else:
-        hub.evidence(ctx)
+        hub.sources(ctx)

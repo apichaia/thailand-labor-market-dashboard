@@ -287,7 +287,7 @@ def _edu_tab(b, f):
 
     st.markdown("**แนวโน้มแยกตามกลุ่มการศึกษา**")
     mode = st.radio("แสดง", ["จำนวน (คน)", "อัตรา (%)"], horizontal=True, key="edu_trend_mode")
-    tf = f.for_trend()   # the whole 2563+ scope; the picked years are shaded
+    tf = f   # only the picked years and quarters
     cnt_t, rates_t = sel_.breakdown_education(b, tf), sel_.education_rates(b, tf)
     if mode.startswith("จำนวน"):
         tr = persons(cnt_t.data)
@@ -420,7 +420,7 @@ def regional(ctx: Ctx) -> None:
     st.markdown("**แนวโน้มแยกตามภูมิภาค**")
     mode = st.radio("แสดง", ["จำนวน (คน)", "อัตรา (%)"], horizontal=True, key="reg_trend_mode")
     col, ttl, unit = ("u_k", "จำนวนผู้ว่างงาน", "คน") if mode.startswith("จำนวน") else ("rate_pct", "อัตราการว่างงาน", "ร้อยละ")
-    td = persons(sel_.region_trend(b, f.for_trend()).data)   # the whole 2563+ scope; the picked years are shaded
+    td = persons(sel_.region_trend(b, f).data)   # only the picked years and quarters
     td["series"] = td["region"]
     if td[col].notna().sum() > 1:
         cf = (b.availability.get("conflicts") or {}).get("rate", []) if col == "rate_pct" else []
@@ -456,9 +456,8 @@ def regional(ctx: Ctx) -> None:
     if ps.empty:
         ui.empty_state(ps.unavailable_reason)
         return
-    _plot(charts.province_bar(ps.data, "rate_pct", "อัตราการว่างงาน", "ร้อยละ", top=15), "prov_bar")
-    ui.chart_caption(ps.source, _plabel_full(pidx), "ร้อยละ", "ตามที่ สสช. เผยแพร่ (15 จังหวัดที่อัตราสูงสุดในไตรมาสนี้ รวมจังหวัดที่ค่าเท่ากับอันดับสุดท้าย) · ตัวเลขในวงเล็บคืออันดับ เครื่องหมาย = คือค่าเท่ากัน",
-                     "ตัวอย่างระดับจังหวัดมีขนาดเล็ก ค่าแกว่งจากการสุ่มสูง ไม่ควรใช้จัดอันดับจังหวัดเพียงไตรมาสเดียว; ค่ารายจังหวัดแกว่งสูง จึงแสดงเป็นแท่ง/ตาราง ส่วนแผนที่ใช้ค่ารายภาค",
+    ui.chart_caption(ps.source, _plabel_full(pidx), "ร้อยละ", "ตามที่ สสช. เผยแพร่",
+                     "ตัวอย่างระดับจังหวัดมีขนาดเล็ก ค่าแกว่งจากการสุ่มสูง ไม่ควรใช้จัดอันดับจังหวัดเพียงไตรมาสเดียว; จึงแสดงเป็นตาราง ส่วนแผนที่ใช้ค่ารายภาค",
                      _src_url("nso_u_province"))
     pt = ps.data[["province", "unemployed_persons", "rate_pct"]].rename(columns={"province": "จังหวัด", "unemployed_persons": "ผู้ว่างงาน (คน)", "rate_pct": "อัตราการว่างงาน (%)"})
     pq = st.text_input("ค้นหาจังหวัด", key="prov_search")

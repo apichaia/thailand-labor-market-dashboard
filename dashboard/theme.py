@@ -186,6 +186,9 @@ section[data-testid="stSidebar"] > div { padding-top: .4rem; }
 section[data-testid="stSidebar"] [data-testid="stSidebarHeader"] { padding: .2rem .6rem 0 .6rem; }
 .logo { display:flex; align-items:center; gap:12px; padding: 14px 14px; margin: 4px 0 10px 0; border-radius: 18px;
   background: linear-gradient(135deg, %PLUM% 0%, #6B3A7D 60%, %MAGENTA% 140%); color:#fff; }
+[data-testid="stSidebarHeader"] { height: 30px !important; min-height: 30px !important; padding-top: 0 !important; padding-bottom: 0 !important; }   /* the header only holds the collapse button: keep it slim so the logo sits near the top */
+[data-testid="stSidebarUserContent"] { padding-top: 0 !important; }
+.logo { margin-top: 0 !important; }
 .logo .mark { font-size: 2.1rem; line-height:1; }
 .logo .t1 { font-weight: 800; letter-spacing: .08em; font-size: 1.35rem; line-height:1.05; }
 .logo .t2 { font-size: .8rem; opacity: .9; }
@@ -210,10 +213,13 @@ section[data-testid="stSidebar"] button[data-variant="pills"] { padding: 2px 10p
 
 /* ---- hero banner ---- */
 .st-key-hero { position: relative; border-radius: 24px; padding: 20px 26px 16px 26px; overflow: hidden; margin-bottom: 14px;
-  background-image: linear-gradient(95deg, #43334C 0%, #6B3F86 52%, #E83C91 100%);
-  background-size: cover; background-position: center 38%; box-shadow: 0 6px 20px rgba(67,51,76,.18); }
+  background-image: linear-gradient(95deg, rgba(67,51,76,.86) 0%, rgba(67,51,76,.55) 42%, rgba(232,60,145,.22) 100%), url(app/static/hero.png);
+  background-size: cover; background-position: center 6%; box-shadow: 0 6px 20px rgba(67,51,76,.18); }
 .st-key-hero h1.hero-t { color:#fff; font-size: 2.1rem; font-weight: 800; margin: 0; line-height: 1.2; text-shadow: 0 2px 8px rgba(0,0,0,.35); }
 .st-key-hero .hero-s { color:#FFE9F2; font-size: 1.02rem; margin-top: 4px; text-shadow: 0 1px 6px rgba(0,0,0,.4); }
+.st-key-hero h1.hero-t, .st-key-hero .hero-s { text-align: center; }
+.st-key-hero { min-height: 190px; display: flex; flex-direction: column; justify-content: center; }   /* tall enough to see the skyline and the workers moving */
+.st-key-hero h1.hero-t, .st-key-hero .hero-s { position: relative; z-index: 2; }
 .hero-chips { display:flex; flex-wrap:wrap; gap:10px; margin-top: 14px; }
 .hero-chip { display:flex; gap:10px; align-items:center; background: rgba(255,255,255,.93); border-radius: 14px; padding: 8px 14px; min-width: 150px; }
 .hero-chip .ic { font-size: 1.3rem; }
@@ -240,7 +246,7 @@ section[data-testid="stSidebar"] button[data-variant="pills"] { padding: 2px 10p
 .gcard .gc-icon { width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; border-radius: 50%; background: rgba(255,255,255,.22); border: 2px solid rgba(255,255,255,.55);
   display:flex; align-items:center; justify-content:center; font-size: 1.5rem; flex: none; }
 .gcard .gc-body { flex: 1; min-width: 0; }
-.gcard .gc-label { font-size: .92rem; white-space: nowrap; font-weight: 700; opacity: .96; }
+.gcard .gc-label { font-size: .92rem; white-space: normal; line-height: 1.25; font-weight: 700; opacity: .96; }   /* the longer summary titles wrap instead of running off the card */
 .gcard .gc-value { font-size: clamp(1.4rem, 1.9vw, 1.9rem); font-weight: 800; line-height: 1.15; display:flex; flex-wrap:wrap; align-items:baseline; column-gap:5px; }
 .gcard .gc-value span { font-size: .8rem; font-weight: 600; opacity: .95; white-space: nowrap; }
 .gcard .gc-scope { font-size: .74rem; opacity: .88; margin-top: 2px; line-height: 1.25; min-height: 2.5em; }
@@ -455,6 +461,7 @@ section[data-testid="stSidebar"] { border-right: none !important; border-radius:
 [class*="st-key-card_"] { border-radius: 28px !important; box-shadow: 0 10px 34px rgba(67,51,76,.09) !important; padding: 14px 18px !important; }
 .gcard { border-radius: 28px; }
 .st-key-kpi_row [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
+.st-key-kpi_row .gcard { min-height: 212px; }   /* the four cards share one height whatever their text length */
 h1, h2, h3, h4, h5, h6, h1 span, h2 span, h3 span, h4 span, [data-testid="stHeading"] *, [data-testid="stHeadingWithActionElements"] * { font-family: 'Kanit', 'Sarabun', 'Noto Sans Thai', 'Leelawadee UI', 'Tahoma', sans-serif !important; }   /* Streamlit sets its own sans on headings */   /* Streamlit pulls markdown up by 1rem: the cards would then overflow their row and sit on top of the strip below */
 .st-key-hero { border-radius: 30px; }
 [class*="st-key-page_"] { animation: lm-page .75s cubic-bezier(.22,1,.36,1) backwards; }
@@ -481,7 +488,7 @@ h1, h2, h3, h4, h5, h6, h1 span, h2 span, h3 span, h4 span, [data-testid="stHead
 }
 [data-testid="stElementContainer"]:has(.mascot-off) { display: none; }
 /* ---------- ranked list (regions by rate) ---------- */
-.rklist { display: flex; flex-direction: column; gap: 22px; padding: 10px 2px 6px; }
+.rklist { display: flex; flex-direction: column; gap: 22px; padding: 10px 2px 30px; }
 .rk { display: flex; align-items: center; gap: 16px; }
 .rk-n { flex: 0 0 22px; font-size: 1.15rem; font-weight: 700; color: #E83C91; text-align: center; font-variant-numeric: tabular-nums; }
 .rk-b { flex: 1; min-width: 0; }

@@ -49,17 +49,6 @@ def test_trend_window_reaches_back_seven_years_and_marks_focus():
     assert wide.for_trend().year_min == 2555
 
 
-def test_shade_focus_draws_only_when_the_pick_is_part_of_the_chart():
-    import plotly.graph_objects as go
-
-    fig = go.Figure()
-    charts.shade_focus(fig, 100, 119, (116, 119))
-    assert len(fig.layout.shapes) == 1 and fig.layout.shapes[0].x0 == 15.5
-    fig2 = go.Figure()
-    charts.shade_focus(fig2, 100, 119, (100, 119))
-    assert len(fig2.layout.shapes) == 0
-
-
 def test_compare_helpers_use_only_valid_values():
     import numpy as np
     from dashboard import overview
