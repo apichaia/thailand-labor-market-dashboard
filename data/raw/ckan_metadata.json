@@ -1,0 +1,702 @@
+{
+  "0706_02_0011": {
+    "id": "0706_02_0011",
+    "title": "อัตราการมีงานทำต่อประชากรวัยแรงงาน",
+    "organization": "สำนักงานสถิติแห่งชาติ",
+    "unit_of_measure": "ร้อยละ",
+    "unit_of_multiplier": "หน่วย",
+    "first_year_of_data": "2558",
+    "last_year_of_data": "2563",
+    "last_updated_date": "2021-03-10",
+    "metadata_modified": "2026-09-25T08:37:21.278786",
+    "update_frequency": "1 ปี",
+    "calculation_method": "(ผู้มีงานทำ หารด้วย ประชากรวัยแรงงาน) x 100",
+    "disaggregate": [
+      "เพศ",
+      "อายุ/กลุ่มอายุ",
+      "ระดับการศึกษา",
+      "อุตสาหกรรม/ประเภทกิจการ"
+    ],
+    "resources": [
+      {
+        "name": "อัตราการมีงานทำต่อประชากรวัยแรงงาน จำแนกระดับการศึกษาที่สำเร็จ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0016_02&format=csv"
+      },
+      {
+        "name": "อัตราการมีงานทำต่อประชากรวัยแรงงาน จำแนกระดับการศึกษาที่สำเร็จ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0016_02&format=json"
+      },
+      {
+        "name": "อัตราการมีงานทำต่อประชากรวัยแรงงาน จำแนกเพศ กลุ่มอายุ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0016_03&format=csv"
+      },
+      {
+        "name": "อัตราการมีงานทำต่อประชากรวัยแรงงาน จำแนกเพศ กลุ่มอายุ ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0016_03&format=json"
+      },
+      {
+        "name": "อัตราการมีงานทำต่อประชากรวัยแรงงาน จำแนกตามภาค และเพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20540&format=csv"
+      },
+      {
+        "name": "อัตราการมีงานทำต่อประชากรวัยแรงงาน",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0016_04&format=csv"
+      },
+      {
+        "name": "อัตราการมีงานทำต่อประชากรวัยแรงงาน",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0016_04&format=json"
+      },
+      {
+        "name": "datadict_อัตราการมีงานทำต่อประชากรวัยแรงงาน",
+        "format": "XLSX",
+        "url": "https://catalogapi.nso.go.th/api/datadic?table=datadict_02_0016&format=csv"
+      }
+    ],
+    "checked_at": "2026-10-24T09:38:38+00:00"
+  },
+  "0706_02_0003": {
+    "id": "0706_02_0003",
+    "title": "จำนวนผู้ว่างงาน",
+    "organization": "สำนักงานสถิติแห่งชาติ",
+    "unit_of_measure": "คน",
+    "unit_of_multiplier": "พัน",
+    "first_year_of_data": "2555",
+    "last_year_of_data": "2563",
+    "last_updated_date": "2021-03-10",
+    "metadata_modified": "2026-09-25T08:21:52.768401",
+    "update_frequency": "1 ปี",
+    "calculation_method": "ยอดรวมจำนวนผู้ว่างงาน",
+    "disaggregate": [
+      "เพศ",
+      "อายุ/กลุ่มอายุ",
+      "ระดับการศึกษา",
+      "สถานภาพการทำงาน",
+      "อุตสาหกรรม/ประเภทกิจการ"
+    ],
+    "resources": [
+      {
+        "name": "จำนวนผู้ว่างงาน",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0003_01&format=csv"
+      },
+      {
+        "name": "จำนวนผู้ว่างงาน",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0003_01&format=json"
+      },
+      {
+        "name": "จำนวนผู้ว่างงาน จำแนกตามระยะเวลาที่หางานทำ ระดับการศึกษาที่สำเร็จ เพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0003_02&format=csv"
+      },
+      {
+        "name": "จำนวนผู้ว่างงาน จำแนกตามระยะเวลาที่หางานทำ ระดับการศึกษาที่สำเร็จ เพศ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0003_02&format=json"
+      },
+      {
+        "name": "จำนวนผู้ว่างงาน จำแนกตามอุตสาหกรรมที่ทำ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0003_03&format=csv"
+      },
+      {
+        "name": "จำนวนผู้ว่างงาน จำแนกตามอุตสาหกรรมที่ทำ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0003_03&format=json"
+      },
+      {
+        "name": "จำนวนผู้ว่างงาน จำแนกตามกลุ่มอายุ สถานภาพแรงงาน",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0003_04&format=csv"
+      },
+      {
+        "name": "จำนวนผู้ว่างงาน จำแนกตามกลุ่มอายุ สถานภาพแรงงาน",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0003_04&format=json"
+      },
+      {
+        "name": "จำนวนผู้ว่างงาน จำแนกตามระดับการศึกษาที่สำเร็จ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20536_25&format=csv"
+      },
+      {
+        "name": "datadict_จำนวนผู้ว่างงาน",
+        "format": "XLSX",
+        "url": "https://catalogapi.nso.go.th/api/datadic?table=datadict_02_0003&format=csv"
+      },
+      {
+        "name": "ผู้ว่างงาน และอัตราการว่างงาน จำแนกตามเพศ เป็นรายไตรมาส",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0208&format=csv"
+      },
+      {
+        "name": "ผู้ว่างงาน และอัตราการว่างงาน จำแนกตามเพศ เป็นรายไตรมาส",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0208&format=json"
+      }
+    ],
+    "checked_at": "2026-10-24T09:38:39+00:00"
+  },
+  "0706_02_0016": {
+    "id": "0706_02_0016",
+    "title": "อัตราการว่างงาน",
+    "organization": "สำนักงานสถิติแห่งชาติ",
+    "unit_of_measure": "ร้อยละ",
+    "unit_of_multiplier": "หน่วย",
+    "first_year_of_data": "2556",
+    "last_year_of_data": "2563",
+    "last_updated_date": "2021-03-10",
+    "metadata_modified": "2026-09-25T08:15:58.142761",
+    "update_frequency": "1 ปี",
+    "calculation_method": "(จำนวนผู้ว่างงาน หารด้วย กำลังแรงงาน) x 100",
+    "disaggregate": [
+      "เพศ",
+      "อายุ/กลุ่มอายุ",
+      "ระดับการศึกษา"
+    ],
+    "resources": [
+      {
+        "name": "อัตราการว่างงาน จำแนกตามกลุ่มอายุ เพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0020_01&format=csv"
+      },
+      {
+        "name": "อัตราการว่างงาน จำแนกตามกลุ่มอายุ เพศ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0020_01&format=json"
+      },
+      {
+        "name": "อัตราการว่างงาน จำแนกตามระดับการศึกษาที่สำเร็จ เพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0020_02&format=csv"
+      },
+      {
+        "name": "อัตราการว่างงาน จำแนกตามระดับการศึกษาที่สำเร็จ เพศ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0020_02&format=json"
+      },
+      {
+        "name": "อัตราการว่างงาน จำแนกตามภาค เพศ และกลุ่มอายุ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20542_22&format=csv"
+      },
+      {
+        "name": "อัตราการว่างงาน จำแนกตามเพศ และระดับการศึกษาที่สำเร็จ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20542_23&format=csv"
+      },
+      {
+        "name": "อัตราการว่างงาน",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0016_01&format=csv"
+      },
+      {
+        "name": "อัตราการว่างงาน",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0016_01&format=json"
+      },
+      {
+        "name": "อัตราการว่างงานของเยาวชนหรือเด็กจบใหม่",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0016_02&format=csv"
+      },
+      {
+        "name": "อัตราการว่างงานของเยาวชนหรือเด็กจบใหม่",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0016_02&format=json"
+      },
+      {
+        "name": "อัตราการว่างงาน (อายุ 15 ปีขึ้นไป)",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_OS_02_0020_03_SDG&format=csv"
+      },
+      {
+        "name": "อัตราการว่างงาน (อายุ 15 ปีขึ้นไป)",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_OS_02_0020_03_SDG&format=json"
+      },
+      {
+        "name": "datadict_อัตราการว่างงาน",
+        "format": "XLSX",
+        "url": "https://catalogapi.nso.go.th/api/datadic?table=datadict_02_0020&format=csv"
+      }
+    ],
+    "checked_at": "2026-10-24T09:38:39+00:00"
+  },
+  "0706_02_0001": {
+    "id": "0706_02_0001",
+    "title": "จำนวนกำลังแรงงานรวม",
+    "organization": "สำนักงานสถิติแห่งชาติ",
+    "unit_of_measure": "คน",
+    "unit_of_multiplier": "พัน",
+    "first_year_of_data": "2555",
+    "last_year_of_data": "2563",
+    "last_updated_date": "2021-03-10",
+    "metadata_modified": "2026-09-25T08:28:06.886379",
+    "update_frequency": "1 ปี",
+    "calculation_method": "ยอดรวมจำนวนกำลังแรงงานรวม",
+    "disaggregate": [
+      "เพศ",
+      "อายุ/กลุ่มอายุ"
+    ],
+    "resources": [
+      {
+        "name": "จำนวนกำลังแรงงานรวม จำแนกตามสถานภาพแรงงาน เพศ รายจังหวัด",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=ST_02_2005005_4&format=csv"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม จำแนกตามสถานภาพแรงงาน เพศ รายจังหวัด",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=ST_02_2005005_4&format=json"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม จำแนกตามเพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0001_01&format=csv"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม จำแนกตามเพศ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0001_01&format=json"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม จำแนกตามเพศ รายจังหวัด",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0001_03&format=csv"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม จำแนกตามเพศ รายจังหวัด",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0001_03&format=json"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม จำแนกตามกลุุ่มอายุ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0001_02&format=csv"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม จำแนกตามภาค และเพศ ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20534_1&format=csv"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม จำแนกตามกลุ่มอายุ และเพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20534_3&format=csv"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0001_01&format=csv"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวม",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0001_01&format=json"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวมเพศหญิง",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0001_02&format=csv"
+      },
+      {
+        "name": "จำนวนกำลังแรงงานรวมเพศหญิง",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0001_02&format=json"
+      },
+      {
+        "name": "datadict_จำนวนกำลังแรงงานรวม",
+        "format": "XLSX",
+        "url": "https://catalogapi.nso.go.th/api/datadic?table=datadict_02_0001&format=csv"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไป จำแนกตามสถานภาพแรงงาน เป็นรายไตรมาส",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0202&format=csv"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไป จำแนกตามสถานภาพแรงงาน เป็นรายไตรมาส",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0202&format=json"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไป จำแนกตามเพศ และสถานภาพแรงงาน เป็นรายไตรมาส",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0703&format=csv"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไป จำแนกตามเพศ และสถานภาพแรงงาน เป็นรายไตรมาส",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0703&format=json"
+      }
+    ],
+    "checked_at": "2026-10-24T09:38:40+00:00"
+  },
+  "0706_02_0002": {
+    "id": "0706_02_0002",
+    "title": "จำนวนผู้มีงานทำ",
+    "organization": "สำนักงานสถิติแห่งชาติ",
+    "unit_of_measure": "คน",
+    "unit_of_multiplier": "พัน",
+    "first_year_of_data": "2555",
+    "last_year_of_data": "2563",
+    "last_updated_date": "2021-03-10",
+    "metadata_modified": "2026-09-25T08:08:29.139432",
+    "update_frequency": "1 ปี",
+    "calculation_method": "ยอดรวมจำนวนผู้มีงานทำ",
+    "disaggregate": [
+      "เพศ",
+      "อายุ/กลุ่มอายุ",
+      "ระดับการศึกษา",
+      "อาชีพ",
+      "สถานภาพการทำงาน",
+      "อุตสาหกรรม/ประเภทกิจการ"
+    ],
+    "resources": [
+      {
+        "name": "datadict_จำนวนผู้มีงานทำ",
+        "format": "XLSX",
+        "url": "https://catalogapi.nso.go.th/api/datadic?table=datadict_02_0002&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามกลุ่มอายุ เพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_01&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามกลุ่มอายุ เพศ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_01&format=json"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามระดับการศึกษาที่สำเร็จ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_02&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามระดับการศึกษาที่สำเร็จ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_02&format=json"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามอาชีพ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_03&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามอาชีพ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_03&format=json"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามสถานภาพการทำงาน",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_04&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามสถานภาพการทำงาน",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_04&format=json"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามอุตสาหกรรม",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_05&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามอุตสาหกรรม",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_05&format=json"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามเพศ รายจังหวัด",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=ST_02_2005006_6&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามภาค และเพศ ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20535_1&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามภาค อาชีพ และเพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20535_7&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามภาค อุตสาหกรรม และเพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20535_8&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามภาค สถานภาพการทำงาน และเพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20535_9&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามภาค ระดับการศึกษาที่สำเร็จ และเพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20535_10&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามภาค ชั่วโมงการทำงานต่อสัปดาห์ และเพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20535_13&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_01&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_01&format=json"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำในภาคเกษตร",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_02&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำในภาคเกษตร",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_02&format=json"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำในภาคการผลิต",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_03&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำในภาคการผลิต",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_03&format=json"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำในภาคบริการ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_04&format=csv"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำในภาคบริการ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_04&format=json"
+      },
+      {
+        "name": "ร้อยละของผู้มีงานทำในกิจกรรมของภาครัฐ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_05&format=csv"
+      },
+      {
+        "name": "ร้อยละของผู้มีงานทำในกิจกรรมของภาครัฐ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=IMD_02_0002_05&format=json"
+      },
+      {
+        "name": "ร้อยละของผู้มีงานทำ จำแนกตามอุตสาหกรรม",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_06_SDG&format=csv"
+      },
+      {
+        "name": "ร้อยละของผู้มีงานทำ จำแนกตามอุตสาหกรรม",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0002_06_SDG&format=json"
+      },
+      {
+        "name": "ร้อยละของผู้มีงานทำในกิจกรรมการผลิต",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_ADD_OS_02_0002_07_SDG&format=csv"
+      },
+      {
+        "name": "ร้อยละของผู้มีงานทำในกิจกรรมการผลิต",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_ADD_OS_02_0002_07_SDG&format=json"
+      },
+      {
+        "name": "จำนวนผู้มีงานทำ จำแนกตามกลุ่มอายุ รายจังหวัด",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20546_01&format=csv"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามอาชีพ และเพศ เป็นรายไตรมาส",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0203&format=csv"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามอาชีพ และเพศ เป็นรายไตรมาส",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0203&format=json"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามกิจกรรมทางเศรษฐกิจ และเพศ เป็นรายไตรมาส",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0204&format=csv"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามกิจกรรมทางเศรษฐกิจ และเพศ เป็นรายไตรมาส",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0204&format=json"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามสถานภาพการทำงาน และเพศ เป็นรายไตรมาส",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0205&format=csv"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามสถานภาพการทำงาน และเพศ เป็นรายไตรมาส",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0205&format=json"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามระดับการศึกษาที่สำเร็จ และเพศ เป็นรายไตรมาส",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0206&format=csv"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามระดับการศึกษาที่สำเร็จ และเพศ เป็นรายไตรมาส",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0206&format=json"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามจำนวนชั่วโมงทำงานต่อสัปดาห์ และเพศ เป็นรายไตรมาส",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0207&format=csv"
+      },
+      {
+        "name": "ประชากรอายุ 15 ปีขึ้นไปที่มีงานทำ จำแนกตามจำนวนชั่วโมงทำงานต่อสัปดาห์ และเพศ เป็นรายไตรมาส",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=SFD_SPB0207&format=json"
+      }
+    ],
+    "checked_at": "2026-10-24T09:38:40+00:00"
+  },
+  "dataset_17_01": {
+    "id": "dataset_17_01",
+    "title": "Quarterly Gross Domestic product at Chain volume measures",
+    "organization": "สำนักงานสภาพัฒนาการเศรษฐกิจและสังคมแห่งชาติ",
+    "unit_of_measure": "บาท",
+    "unit_of_multiplier": "ล้านล้าน",
+    "first_year_of_data": "2536",
+    "last_year_of_data": "2568",
+    "last_updated_date": "2026-03-24",
+    "metadata_modified": "2026-07-25T09:05:41.791127",
+    "update_frequency": "1 ไตรมาส",
+    "calculation_method": "มูลค่าการผลิตและการใช้จ่ายในการซื้อสินค้าและบริการขั้นสุดท้ายในการซื้อสินค้าและบริการขั้นสุดท้าย ในรอบ 1 ไตรมาส",
+    "disaggregate": [
+      "อื่นๆ"
+    ],
+    "resources": [
+      {
+        "name": "ChainVolumeMeasures",
+        "format": "XLSX",
+        "url": "https://www.nesdc.go.th/wordpress/wp-content/uploads/2026/03/ChainVolumeMeasures.xlsx"
+      }
+    ],
+    "checked_at": "2026-10-24T09:38:40+00:00"
+  },
+  "unemployment-benefit": {
+    "id": "unemployment-benefit",
+    "title": "จำนวนผู้ใช้บริการสิทธิประโยชน์ มาตรา 33 และมาตรา 39 กรณีว่างงานของผู้ประกันตน",
+    "organization": "สำนักงานประกันสังคม",
+    "unit_of_measure": "คน",
+    "unit_of_multiplier": "",
+    "first_year_of_data": "",
+    "last_year_of_data": "",
+    "last_updated_date": null,
+    "metadata_modified": "2026-09-07T01:56:13.813765",
+    "update_frequency": "1 ปี",
+    "calculation_method": "",
+    "disaggregate": [
+      "อื่นๆ"
+    ],
+    "resources": [
+      {
+        "name": "ข้อมูลจำนวนผู้ใช้บริการสิทธิประโยชน์กรณีว่างงานของผู้ประกันตน มาตรา 33 และมาตรา 39 ปี 2563-2565",
+        "format": "CSV",
+        "url": "https://catalog.sso.go.th/dataset/311698d3-cd1f-4c74-820e-48e0796d2547/resource/e8d1b8f4-8d5b-44ba-ae8e-e3a2d424da9f/download/-33-39-.csv"
+      }
+    ],
+    "checked_at": "2026-10-24T09:38:41+00:00"
+  },
+  "ds-834": {
+    "id": "ds-834",
+    "title": "ผู้ว่างงานที่เคยทำงานจำแนกตามเหตุผลที่ออกจากงาน",
+    "organization": "ธนาคารแห่งประเทศไทย",
+    "unit_of_measure": null,
+    "unit_of_multiplier": null,
+    "first_year_of_data": null,
+    "last_year_of_data": null,
+    "last_updated_date": null,
+    "metadata_modified": "2026-07-23T11:17:37.196598",
+    "update_frequency": "1 ไตรมาส",
+    "calculation_method": null,
+    "disaggregate": [],
+    "resources": [
+      {
+        "name": "ผู้ว่างงานที่เคยทำงานจำแนกตามเหตุผลที่ออกจากงาน",
+        "format": "URL",
+        "url": "https://app.bot.or.th/BTWS_STAT/statistics/BOTWEBSTAT.aspx?reportID=669&language=TH"
+      }
+    ],
+    "checked_at": "2026-10-24T09:38:41+00:00"
+  },
+  "0706_02_0019": {
+    "id": "0706_02_0019",
+    "title": "ค่าจ้างเฉลี่ยของลูกจ้าง",
+    "organization": "สำนักงานสถิติแห่งชาติ",
+    "unit_of_measure": "บาทต่อเดือน",
+    "unit_of_multiplier": "หน่วย",
+    "first_year_of_data": "2561",
+    "last_year_of_data": "2562",
+    "last_updated_date": "2020-10-30",
+    "metadata_modified": "2026-09-25T07:52:33.155295",
+    "update_frequency": "1 ปี",
+    "calculation_method": "(ค่าจ้างเฉลี่ย หารด้วย จำนวนลูกจ้างทั้งหมด) x 100",
+    "disaggregate": [
+      "เพศ",
+      "อายุ/กลุ่มอายุ"
+    ],
+    "resources": [
+      {
+        "name": "ค่าจ้างเฉลี่ยของลูกจ้าง จำแนกตามกลุ่มอายุ เพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0024_01&format=csv"
+      },
+      {
+        "name": "ค่าจ้างเฉลี่ยของลูกจ้าง จำแนกตามกลุ่มอายุ เพศ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0024_01&format=json"
+      },
+      {
+        "name": "ค่าจ้างเฉลี่ยของลูกจ้าง จำแนกตามระดับการศึกษา เพศ",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0024_02&format=csv"
+      },
+      {
+        "name": "ค่าจ้างเฉลี่ยของลูกจ้าง จำแนกตามระดับการศึกษา เพศ",
+        "format": "JSON",
+        "url": "https://catalogapi.nso.go.th/api/index?table=OS_02_0024_02&format=json"
+      },
+      {
+        "name": "ค่าจ้างเฉลี่ยต่อเดือนของลูกจ้าง จำแนกตามภาค และอุตสาหกรรม",
+        "format": "CSV",
+        "url": "https://catalogapi.nso.go.th/api/index?table=LFS_02_20545_18&format=csv"
+      },
+      {
+        "name": "datadict_ค่าจ้างเฉลี่ยของลูกจ้าง",
+        "format": "XLSX",
+        "url": "https://catalogapi.nso.go.th/api/datadic?table=datadict_02_0024&format=csv"
+      }
+    ],
+    "checked_at": "2026-10-24T09:38:38+00:00"
+  }
+}
